@@ -43,6 +43,14 @@
       pending    = '',
       header     = '󰆍',
       arrow      = '→',
+      run        = '',  -- statuscolumn idle 状态图标
+    },
+    sign = {                          -- statuscolumn 脚本行标记（按状态配置）
+      idle    = { hl = 'VVTaskSignIdle' },
+      running = { hl = 'VVTaskSignRunning' },
+      success = { hl = 'VVTaskSignSuccess' },
+      failed  = { hl = 'VVTaskSignFailed' },
+      stopped = { hl = 'VVTaskSignStopped' },
     },
   },
 }
@@ -62,6 +70,63 @@
 | `term_width` | `integer` | `80` | `right` 模式下终端宽度 |
 | `providers` | `string[]?` | `nil` | Provider 白名单；`nil` 启用所有已注册 |
 | `icons` | `table<string, string>` | *见上方* | 图标配置，可逐项覆盖 |
+| `sign` | `table<string, VVTaskSignState>` | *见上方* | Statuscolumn 标记按状态配置 icon / hl |
+
+## Statuscolumn Signs
+
+打开 `package.json` / `deno.json` 时，脚本行的 statuscolumn 自动显示可运行标记，标记随任务状态实时变化：
+
+| 状态 | 图标 | 颜色 | 说明 |
+|------|------|------|------|
+| idle | `icons.run` | 蓝 (`DiagnosticInfo`) | 未运行，可点击执行 |
+| running | `icons.running` | 绿 (`DiagnosticOk`) | 运行中，点击聚焦终端 |
+| success | `icons.success` | 绿 (`DiagnosticOk`) | 运行成功 |
+| failed | `icons.failed` | 红 (`DiagnosticError`) | 运行失败 |
+| stopped | `icons.stopped` | 红 (`DiagnosticError`) | 手动终止 |
+
+**运行方式**：
+
+- 鼠标点击 gutter 区域的标记图标
+- 光标移到脚本行，按 `gx` 或执行 `:VVTaskRunLine`
+
+**覆盖单个状态的图标 / 高亮**：
+
+```lua
+opts = {
+  sign = {
+    running = { icon = '⟳', hl = 'MyCustomRunning' },
+  },
+}
+```
+
+未设置 `icon` 的状态自动复用 `icons` 表同名项。
+
+### 自定义 Sign Parser
+
+为新文件类型注册脚本行解析器，即可在 statuscolumn 显示运行标记：
+
+```lua
+require('vv-task-panel').register_sign_parser('Cargo.toml', function(buf)
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  local dir = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ':h')
+  local result = {}
+  for i, line in ipairs(lines) do
+    local name = line:match('^name%s*=%s*"([^"]+)"')
+    if name then
+      result[#result + 1] = {
+        lnum = i,
+        name = name,
+        argv = { 'cargo', 'run', '--bin', name },
+        cwd = dir,
+        badge = 'cargo',
+      }
+    end
+  end
+  return result
+end)
+```
+
+---
 
 ### 内置 npm Provider
 

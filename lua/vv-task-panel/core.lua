@@ -12,6 +12,12 @@ local M = {}
 ---@field term_width integer
 ---@field providers? string[] nil = 启用所有已注册；否则白名单
 ---@field icons table<string, string>
+---@field sign table<string, { icon?: string, hl: string }>
+
+---@class VVTaskSignState
+---@field icon? string  覆盖 icons 表中的图标（nil 则复用 icons 同名项）
+---@field hl string     高亮组名
+
 M.config = {
   width = 44,
   position = 'right',
@@ -27,12 +33,21 @@ M.config = {
     pkg_closed = '',
     package    = '󰏖',
     running    = '●',
-    success    = '',
-    failed     = '',
+    success    = '',
+    failed     = '●',
     stopped    = '●',
-    pending    = '',
+    pending    = '',
     header     = '󰆍',
     arrow      = '→',
+    run        = '',
+  },
+  sign = {
+    idle    = { hl = 'VVTaskSignIdle' },
+    running = { hl = 'VVTaskSignRunning' },
+    success = { hl = 'VVTaskSignSuccess' },
+    failed  = { hl = 'VVTaskSignFailed' },
+    stopped = { hl = 'VVTaskSignStopped' },
+    keys = { { 'gx', desc = 'Run script' } },
   },
 }
 

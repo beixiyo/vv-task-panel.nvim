@@ -27,27 +27,28 @@
 
 local core = require('vv-task-panel.core')
 local ui = require('vv-task-panel.ui')
+local sign = require('vv-task-panel.sign')
 
 local M = {}
 
 ---@param opts VVTaskPanelConfig|nil
 function M.setup(opts)
   core.setup(opts)
-  -- 注册内置 provider
   core.register_provider(require('vv-task-panel.providers.npm'))
   ui.setup_commands()
+  sign.setup()
 end
 
 M.register_provider = core.register_provider
+M.register_sign_parser = sign.register_parser
 
--- 公开 UI 入口（供 keymap / API 调用）
 M.open      = ui.open_panel
 M.close     = ui.close_panel
 M.toggle    = ui.toggle_panel
 M.refresh   = ui.refresh
 M.tasks     = ui.open_tasklist
+M.run_at_cursor = sign.run_at_cursor
 
--- 访问内部 state（调试/扩展用）
 M._core = core
 
 return M
