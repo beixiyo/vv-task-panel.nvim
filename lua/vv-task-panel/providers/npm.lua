@@ -131,7 +131,7 @@ local function detect_workspace(root)
 
   if patterns then
     -- 2. 展开 globs 收集子包
-    local cfg = require('vv-task-panel.core').config
+    local cfg = require('vv-task-panel.core').get_config()
     local excludes = {}
     for _, d in ipairs(cfg.exclude_dirs or {}) do excludes[d] = true end
     results = expand_globs(root, patterns, excludes)

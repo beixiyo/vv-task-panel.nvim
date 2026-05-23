@@ -87,7 +87,7 @@
 **运行方式**：
 
 - 鼠标点击 gutter 区域的标记图标
-- 光标移到脚本行，按 `gx` 或执行 `:VVTaskRunLine`
+- 光标移到脚本行，按 `gx` 或执行 `:VVTaskPanelRunLine`
 
 **覆盖单个状态的图标 / 高亮**：
 

@@ -30,7 +30,7 @@ end
 ---@param title string
 ---@return integer win
 local function open_term_win(buf, title)
-  local cfg = core.config
+  local cfg = core.get_config()
   local win
   if cfg.term_position == 'bottom' then
     vim.cmd(string.format('botright %dsplit', cfg.term_height))

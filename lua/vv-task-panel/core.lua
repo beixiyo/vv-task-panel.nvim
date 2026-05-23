@@ -2,23 +2,23 @@
 local M = {}
 
 ---@class VVTaskPanelConfig
----@field width integer 面板宽度
----@field position 'left' | 'right'
----@field exclude_dirs string[] 扫描时跳过的目录名
----@field scan_strategy 'workspace' | 'walk' workspace=仅扫描 workspace 定义的目录；walk=递归遍历
----@field max_depth integer walk 策略的最大递归深度
----@field term_position 'bottom' | 'right' | 'float'
----@field term_height integer
----@field term_width integer
----@field providers? string[] nil = 启用所有已注册；否则白名单
----@field icons table<string, string>
----@field sign table<string, { icon?: string, hl: string }>
+---@field width integer 面板宽度 @default 44
+---@field position 'left' | 'right' @default 'right'
+---@field exclude_dirs string[] 扫描时跳过的目录名 @default { 'node_modules', '.git', 'dist', ... }
+---@field scan_strategy 'workspace' | 'walk' workspace=仅扫描 workspace 定义的目录；walk=递归遍历 @default 'workspace'
+---@field max_depth integer walk 策略的最大递归深度 @default 8
+---@field term_position 'bottom' | 'right' | 'float' @default 'bottom'
+---@field term_height integer @default 15
+---@field term_width integer @default 80
+---@field providers? string[] nil = 启用所有已注册；否则白名单 @default nil
+---@field icons table<string, string> @default { pkg_open = '', pkg_closed = '', ... }
+---@field sign { idle: VVTaskSignState, running: VVTaskSignState, success: VVTaskSignState, failed: VVTaskSignState, stopped: VVTaskSignState, keys: { [integer]: { [1]: string, desc: string } } } @default { idle = { hl = 'VVTaskSignIdle' }, ..., keys = { { 'gx', desc = 'Run script' } } }
 
 ---@class VVTaskSignState
 ---@field icon? string  覆盖 icons 表中的图标（nil 则复用 icons 同名项）
 ---@field hl string     高亮组名
 
-M.config = {
+local config = {
   width = 44,
   position = 'right',
   exclude_dirs = { 'node_modules', '.git', 'dist', 'build', '.next', '.turbo', '.cache', 'coverage', '.nuxt', 'out' },
@@ -102,7 +102,7 @@ M.tasks = {}
 M._next_task_id = 1
 
 function M.setup(opts)
-  M.config = vim.tbl_deep_extend('force', M.config, opts or {})
+  config = vim.tbl_deep_extend('force', config, opts or {})
 end
 
 ---注册 provider
@@ -117,7 +117,7 @@ end
 ---@param provider_name string
 ---@return boolean
 local function is_enabled(provider_name)
-  local enabled = M.config.providers
+  local enabled = config.providers
   if enabled == nil then return true end
   return vim.tbl_contains(enabled, provider_name)
 end
@@ -132,10 +132,10 @@ function M.discover(root)
 
   for name, p in pairs(M.providers) do
     if is_enabled(name) then
-      local ok_d, paths = pcall(p.detect, root, M.config)
+      local ok_d, paths = pcall(p.detect, root, config)
       if ok_d and type(paths) == 'table' then
         for _, path in ipairs(paths) do
-          local ok_p, g = pcall(p.parse, path, M.config)
+          local ok_p, g = pcall(p.parse, path, config)
           if ok_p and g and type(g.tasks) == 'table' and #g.tasks > 0 then
             g.provider = name
             g.id = g.id or path
@@ -170,6 +170,12 @@ function M.find_recent_task(group_id, task_name)
     end
   end
   return latest
+end
+
+---获取当前配置（只读副本）
+---@return VVTaskPanelConfig
+function M.get_config()
+  return vim.deepcopy(config)
 end
 
 return M

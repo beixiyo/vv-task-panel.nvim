@@ -30,9 +30,10 @@ local icon_keys = {
 ---@param state string
 ---@return { icon: string, hl: string }
 local function get_style(state)
-  local s = (core.config.sign or {})[state] or {}
+  local cfg = core.get_config()
+  local s = (cfg.sign or {})[state] or {}
   return {
-    icon = s.icon or core.config.icons[icon_keys[state] or 'run'] or '',
+    icon = s.icon or cfg.icons[icon_keys[state] or 'run'] or '',
     hl = s.hl or 'VVTaskSignIdle',
   }
 end
@@ -164,7 +165,7 @@ local function bind_buf_keys(buf)
   if buf_keymapped[buf] then return end
   buf_keymapped[buf] = true
 
-  local keys = (core.config.sign or {}).keys
+  local keys = (core.get_config().sign or {}).keys
   if not keys then return end
 
   for _, k in ipairs(keys) do
@@ -328,7 +329,7 @@ function M.setup()
     end,
   })
 
-  vim.api.nvim_create_user_command('VVTaskRunLine', M.run_at_cursor, {
+  vim.api.nvim_create_user_command('VVTaskPanelRunLine', M.run_at_cursor, {
     desc = 'Run script on current line',
   })
 

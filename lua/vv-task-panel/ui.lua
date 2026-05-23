@@ -52,7 +52,7 @@ local function setup_highlights()
 end
 
 local function status_glyph(rec)
-  local ic = core.config.icons
+  local ic = core.get_config().icons
   if not rec then return ic.pending end
   if rec.status == 'running' then return ic.running end
   if rec.status == 'success' then return ic.success end
@@ -78,7 +78,8 @@ local function render_panel()
   line_map = {}
   local lines = {}
   local marks = {}
-  local ic = core.config.icons
+  local cfg = core.get_config()
+  local ic = cfg.icons
   local groups = core.groups
 
   -- 头部
@@ -92,7 +93,7 @@ local function render_panel()
     table.insert(marks, { 0, #title, { virt_text = { {
       string.format('  %d grp · %d tasks', #groups, total_tasks), 'Comment',
     } }, virt_text_pos = 'eol' } })
-    table.insert(lines, string.rep('─', math.max(10, core.config.width - 2)))
+    table.insert(lines, string.rep('─', math.max(10, cfg.width - 2)))
     table.insert(marks, { 1, 0, { end_col = -1, hl_group = 'VVTaskPanelChevron' } })
     table.insert(lines, '')
   end
@@ -251,8 +252,9 @@ function M.open_panel()
   core.discover(vim.fn.getcwd())
   panel.buf = create_panel_buf()
 
-  local cmd = core.config.position == 'left' and 'topleft' or 'botright'
-  vim.cmd(string.format('%s %dvsplit', cmd, core.config.width))
+  local cfg = core.get_config()
+  local cmd = cfg.position == 'left' and 'topleft' or 'botright'
+  vim.cmd(string.format('%s %dvsplit', cmd, cfg.width))
   panel.win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(panel.win, panel.buf)
 
@@ -329,7 +331,7 @@ end
 ---@return integer max_display_width
 function M.render_tasklist()
   if not tasklist.buf or not vim.api.nvim_buf_is_valid(tasklist.buf) then return 0 end
-  local ic = core.config.icons
+  local ic = core.get_config().icons
   local arrow = ' ' .. (ic.arrow or '→') .. ' '
 
   local rows = {}
