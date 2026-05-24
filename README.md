@@ -16,7 +16,10 @@
 ```lua
 {
   'beixiyo/vv-task-panel.nvim',
-  dependencies = { 'beixiyo/vv-utils.nvim' },
+  dependencies = {
+    'beixiyo/vv-utils.nvim',
+    { 'beixiyo/vv-statuscol.nvim', optional = true },  -- 鼠标点击 sign 运行任务需要此插件
+  },
   cmd = { 'VVTaskPanel', 'VVTaskPanelOpen' },
   ---@type VVTaskPanelConfig
   opts = {
@@ -86,7 +89,7 @@
 
 **运行方式**：
 
-- 鼠标点击 gutter 区域的标记图标
+- 鼠标点击 gutter 区域的标记图标（需安装 [vv-statuscol.nvim](https://github.com/beixiyo/vv-statuscol.nvim)，未安装时点击无效）
 - 光标移到脚本行，按 `gx` 或执行 `:VVTaskPanelRunLine`
 
 **覆盖单个状态的图标 / 高亮**：
