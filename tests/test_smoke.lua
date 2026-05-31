@@ -88,17 +88,21 @@ end)
 
 print('\n[FIX 8] _uptime_timer 关闭释放')
 
-test('close_panel 包含 timer 清理逻辑', function()
+test('close_panel 经 cleanup_panel 清理 timer', function()
   local ui_path = vim.fn.fnamemodify(debug.getinfo(1, 'S').source:sub(2), ':h:h')
     .. '/lua/vv-task-panel/ui.lua'
   local content = table.concat(vim.fn.readfile(ui_path), '\n')
 
-  -- close_panel 函数内应包含 timer 清理
+  -- timer 的 stop/close/nil 已抽进共享 cleanup_panel（close_panel 与 BufWipeout 复用）
   local close_fn = content:match('function M%.close_panel%(%)(.-)\nend')
   assert(close_fn, 'close_panel function found')
-  assert(close_fn:find('_uptime_timer:stop'), 'should stop timer')
-  assert(close_fn:find('_uptime_timer:close'), 'should close timer')
-  assert(close_fn:find('_uptime_timer = nil'), 'should nil timer')
+  assert(close_fn:find('cleanup_panel'), 'close_panel 应调用 cleanup_panel 清理')
+
+  local cleanup_fn = content:match('local function cleanup_panel%(%)(.-)\nend')
+  assert(cleanup_fn, 'cleanup_panel function found')
+  assert(cleanup_fn:find('_uptime_timer:stop'), 'cleanup_panel should stop timer')
+  assert(cleanup_fn:find('_uptime_timer:close'), 'cleanup_panel should close timer')
+  assert(cleanup_fn:find('_uptime_timer = nil'), 'cleanup_panel should nil timer')
 end)
 
 test('uv.timer 基础行为: stop+close 正常工作', function()
