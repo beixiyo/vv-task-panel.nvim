@@ -6,22 +6,6 @@ local M = { name = 'npm', priority = 50 }
 
 local yaml = require('vv-utils.yaml')
 
----@param pkg_dir string
----@return 'pnpm' | 'yarn' | 'bun' | 'npm'
-local function detect_pm(pkg_dir)
-  local dir = pkg_dir
-  while dir and dir ~= '/' and dir ~= '' do
-    if vim.uv.fs_stat(dir .. '/pnpm-lock.yaml') then return 'pnpm' end
-    if vim.uv.fs_stat(dir .. '/bun.lockb') or vim.uv.fs_stat(dir .. '/bun.lock') then return 'bun' end
-    if vim.uv.fs_stat(dir .. '/yarn.lock') then return 'yarn' end
-    if vim.uv.fs_stat(dir .. '/package-lock.json') then return 'npm' end
-    local parent = vim.fn.fnamemodify(dir, ':h')
-    if parent == dir then break end
-    dir = parent
-  end
-  return 'npm'
-end
-
 --- 展开 workspace glob 模式（如 "packages/*"）为含 package.json 的目录列表
 ---@param root string
 ---@param patterns string[]
@@ -31,52 +15,84 @@ local function expand_globs(root, patterns, excludes)
   local results = {}
   local seen = {}
 
+  -- 收集 dir 下含 package.json 的目录
+  -- normalize 折叠 '/./' 等冗余片段，确保 '.' 模式与 root 自身去重一致
+  local function collect(dir)
+    local pkg = vim.fs.normalize(dir .. '/package.json')
+    if vim.uv.fs_stat(pkg) and not seen[pkg] then
+      seen[pkg] = true
+      table.insert(results, pkg)
+    end
+  end
+
+  -- 枚举 dir 下通过过滤的直接子目录名（统一 excludes/dotdir 过滤）
+  local function child_dirs(dir)
+    local names = {}
+    local handle = vim.uv.fs_scandir(dir)
+    if not handle then return names end
+    while true do
+      local name, typ = vim.uv.fs_scandir_next(handle)
+      if not name then break end
+      if typ == 'directory' and not excludes[name] and name:sub(1, 1) ~= '.' then
+        table.insert(names, name)
+      end
+    end
+    return names
+  end
+
+  -- 递归收集 dir（含自身）下所有含 package.json 的子目录
+  local function collect_recursive(dir)
+    collect(dir)
+    for _, name in ipairs(child_dirs(dir)) do
+      collect_recursive(dir .. '/' .. name)
+    end
+  end
+
+  -- 把 pattern 按 / 拆成段，逐段下钻
+  --   字面段 → 直接拼路径；'*' → 单层枚举子目录；'**' → 递归收集
+  -- segs：剩余待匹配段；dir：当前已确定的绝对目录
+  local function match(dir, segs, idx)
+    if idx > #segs then
+      collect(dir)
+      return
+    end
+    local seg = segs[idx]
+    if seg == '**' then
+      -- 递归通配：'**' 作为末段时收集整棵子树
+      if idx == #segs then
+        collect_recursive(dir)
+      else
+        match(dir, segs, idx + 1)                      -- ** 可匹配零段（globstar 语义）
+        for _, name in ipairs(child_dirs(dir)) do
+          match(dir .. '/' .. name, segs, idx)        -- ** 可匹配多层
+          match(dir .. '/' .. name, segs, idx + 1)
+        end
+      end
+    elseif seg:find('%*') then
+      -- 段内含 '*'：枚举子目录后用 Lua 模式约束（如 '*' 命中全部）
+      local lua_pat = '^' .. seg:gsub('([%-%.%+%[%]%(%)%$%^%%%?])', '%%%1'):gsub('%*', '.*') .. '$'
+      for _, name in ipairs(child_dirs(dir)) do
+        if name:match(lua_pat) then
+          match(dir .. '/' .. name, segs, idx + 1)
+        end
+      end
+    else
+      -- 字面段：目录存在才继续下钻
+      local next_dir = dir .. '/' .. seg
+      if vim.uv.fs_stat(next_dir) then
+        match(next_dir, segs, idx + 1)
+      end
+    end
+  end
+
   for _, pattern in ipairs(patterns) do
     -- 跳过排除规则
     if pattern:sub(1, 1) == '!' then goto continue end
 
-    -- 去掉尾部 /* 或 /**，取基础目录
-    local base = pattern:gsub('/[*]+$', '')
-    local is_recursive = pattern:match('%*%*')
-    local base_dir = root .. '/' .. base
-
-    if not vim.uv.fs_stat(base_dir) then goto continue end
-
-    if is_recursive then
-      -- 递归收集所有含 package.json 的子目录
-      local function collect(dir)
-        local handle = vim.uv.fs_scandir(dir)
-        if not handle then return end
-        while true do
-          local name, typ = vim.uv.fs_scandir_next(handle)
-          if not name then break end
-          local full = dir .. '/' .. name
-          if typ == 'directory' and not excludes[name] and name:sub(1, 1) ~= '.' then
-            if vim.uv.fs_stat(full .. '/package.json') and not seen[full] then
-              seen[full] = true
-              table.insert(results, full .. '/package.json')
-            end
-            collect(full)
-          end
-        end
-      end
-      collect(base_dir)
-    else
-      -- 单层：枚举 base_dir 下的直接子目录
-      local handle = vim.uv.fs_scandir(base_dir)
-      if handle then
-        while true do
-          local name, typ = vim.uv.fs_scandir_next(handle)
-          if not name then break end
-          if typ == 'directory' then
-            local pkg = base_dir .. '/' .. name .. '/package.json'
-            if vim.uv.fs_stat(pkg) and not seen[pkg] then
-              seen[pkg] = true
-              table.insert(results, pkg)
-            end
-          end
-        end
-      end
+    -- 拆段后逐段匹配，支持裸 '*'、中间通配 'packages/*/lib' 等
+    local segs = vim.split(pattern, '/', { plain = true, trimempty = true })
+    if #segs > 0 then
+      match(root, segs, 1)
     end
 
     ::continue::
@@ -201,7 +217,7 @@ function M.parse(path)
   if not ok_json or type(data) ~= 'table' then return nil end
   if type(data.scripts) ~= 'table' then return nil end
 
-  local pm = detect_pm(pkg_dir)
+  local pm = require('vv-task-panel.core').detect_pm(pkg_dir)  -- 与 sign 共用 core 单一实现，避免判定发散
 
   local names = {}
   for k in pairs(data.scripts) do table.insert(names, k) end

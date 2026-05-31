@@ -38,25 +38,48 @@ local function get_style(state)
   }
 end
 
--- ======================= detect_pm =======================
-
----@param pkg_dir string
----@return 'pnpm' | 'yarn' | 'bun' | 'npm'
-local function detect_pm(pkg_dir)
-  local dir = pkg_dir
-  while dir and dir ~= '/' and dir ~= '' do
-    if vim.uv.fs_stat(dir .. '/pnpm-lock.yaml') then return 'pnpm' end
-    if vim.uv.fs_stat(dir .. '/bun.lockb') or vim.uv.fs_stat(dir .. '/bun.lock') then return 'bun' end
-    if vim.uv.fs_stat(dir .. '/yarn.lock') then return 'yarn' end
-    if vim.uv.fs_stat(dir .. '/package-lock.json') then return 'npm' end
-    local parent = vim.fn.fnamemodify(dir, ':h')
-    if parent == dir then break end
-    dir = parent
-  end
-  return 'npm'
-end
-
 -- ======================= JSON section parser =======================
+
+-- 串感知地剥离 JSONC 注释（// 行、/* */ 块）与对象/数组的尾随逗号。
+-- 字符串字面量内的 // 、/* 、, 不应被剥离，故须跟踪是否处于字符串中并处理转义。
+---@param src string
+---@return string
+local function strip_jsonc(src)
+  local out = {}
+  local i, n = 1, #src
+  local in_str = false
+
+  while i <= n do
+    local c = src:sub(i, i)
+
+    if in_str then
+      if c == '\\' then
+        out[#out + 1] = src:sub(i, i + 1)  -- 连同被转义字符整体保留
+        i = i + 2
+      else
+        out[#out + 1] = c
+        if c == '"' then in_str = false end
+        i = i + 1
+      end
+    elseif c == '"' then
+      in_str = true
+      out[#out + 1] = c
+      i = i + 1
+    elseif c == '/' and src:sub(i + 1, i + 1) == '/' then
+      while i <= n and src:sub(i, i) ~= '\n' do i = i + 1 end  -- 跳到行尾（保留换行）
+    elseif c == '/' and src:sub(i + 1, i + 1) == '*' then
+      i = i + 2
+      while i <= n and not (src:sub(i, i) == '*' and src:sub(i + 1, i + 1) == '/') do i = i + 1 end
+      i = i + 2  -- 跳过结尾 */
+    else
+      out[#out + 1] = c
+      i = i + 1
+    end
+  end
+
+  -- 去掉对象/数组结束符前的尾随逗号：  , } / , ]
+  return (table.concat(out):gsub(',(%s*[%}%]])', '%1'))
+end
 
 ---@param section_key string
 ---@param make_entry fun(name: string, dir: string): { name: string, argv: string[], cwd: string, badge: string }|nil
@@ -64,33 +87,49 @@ end
 local function json_section_parser(section_key, make_entry)
   return function(buf)
     local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-    local in_section = false
-    local depth = 0
     local result = {}
     local dir = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ':h')
 
+    -- 用真正的 JSON 解析拿到 section 下的真实 key 集合，
+    -- 避免靠数花括号判段（script 值里的字面 { } 会破坏计数，误判依赖项为脚本）
+    local raw = table.concat(lines, '\n')
+    local ok, data = pcall(vim.json.decode, raw)
+    -- vim.json.decode 对 JSONC（// 行注释、/* */ 块注释、尾随逗号）一律失败，
+    -- 而 deno.jsonc 显式支持注释——失败时剥离注释/尾逗号后重试，避免对带注释文件不打任何 sign
+    if not ok or type(data) ~= 'table' then
+      ok, data = pcall(vim.json.decode, strip_jsonc(raw))
+    end
+    if not ok or type(data) ~= 'table' then return result end
+
+    local section = data[section_key]
+    if type(section) ~= 'table' then return result end
+
+    -- 只接受 section 内的真实 key，每个 key 仅定位一次
+    local valid = {}
+    local pending = 0
+    for name in pairs(section) do
+      valid[name] = true
+      pending = pending + 1
+    end
+    if pending == 0 then return result end
+
+    -- decode 后按行匹配 key 定位行号：从 "section_key" 声明行起向后扫描，
+    -- 命中且尚未定位的真实 key 才打 sign，所有 key 找齐即停
+    local in_section = false
     for i, line in ipairs(lines) do
       if not in_section then
-        if line:match('"' .. section_key .. '"') then
-          in_section = true
-          depth = 0
-          for _ in line:gmatch('{') do depth = depth + 1 end
-          for _ in line:gmatch('}') do depth = depth - 1 end
-        end
+        if line:match('"' .. section_key .. '"%s*:') then in_section = true end
       else
-        for _ in line:gmatch('{') do depth = depth + 1 end
-        for _ in line:gmatch('}') do depth = depth - 1 end
-        if depth <= 0 then
-          in_section = false
-        else
-          local name = line:match('"([^"]+)"%s*:')
-          if name then
-            local entry = make_entry(name, dir)
-            if entry then
-              entry.lnum = i
-              result[#result + 1] = entry
-            end
+        local name = line:match('"([^"]+)"%s*:')
+        if name and valid[name] then
+          valid[name] = nil
+          pending = pending - 1
+          local entry = make_entry(name, dir)
+          if entry then
+            entry.lnum = i
+            result[#result + 1] = entry
           end
+          if pending == 0 then break end
         end
       end
     end
@@ -102,7 +141,7 @@ end
 -- ======================= Built-in parsers =======================
 
 parsers['package.json'] = json_section_parser('scripts', function(name, dir)
-  local pm = detect_pm(dir)
+  local pm = core.detect_pm(dir)  -- 与 npm provider 共用 core 单一实现，避免判定发散
   return { name = name, argv = { pm, 'run', name }, cwd = dir, badge = pm }
 end)
 
@@ -128,10 +167,12 @@ end
 local function update_sign(buf, entry)
   if not vim.api.nvim_buf_is_valid(buf) then return end
   local pos = vim.api.nvim_buf_get_extmark_by_id(buf, ns, entry.id, {})
-  if not pos then return end
+  -- id 不存在时该 API 返回空表 {} 而非 nil，需额外判 pos[1]（与 find_task_at_line 一致）
+  if not pos or not pos[1] then return end
 
   local style = get_style(resolve_state(buf, entry.name))
-  vim.api.nvim_buf_set_extmark(buf, ns, pos[1], 0, {
+  -- set_extmark 失败不应中断 refresh 调用链，加 pcall 兜底
+  pcall(vim.api.nvim_buf_set_extmark, buf, ns, pos[1], 0, {
     id = entry.id,
     sign_text = style.icon,
     sign_hl_group = style.hl,
@@ -220,7 +261,9 @@ local function find_task_at_line(buf, lnum)
   if not tasks then return nil end
   for _, entry in ipairs(tasks) do
     local pos = vim.api.nvim_buf_get_extmark_by_id(buf, ns, entry.id, {})
-    if pos and pos[1] + 1 == lnum then return entry end
+    -- id 失效时该 API 返回空表 {}（truthy）而非 nil，需额外判 pos[1]（与 update_sign 一致），
+    -- 否则 nil + 1 抛 "attempt to perform arithmetic on a nil value"
+    if pos and pos[1] and pos[1] + 1 == lnum then return entry end
   end
   return nil
 end
@@ -309,7 +352,10 @@ function M.setup()
     patterns[#patterns + 1] = '*/' .. fname
   end
 
-  vim.api.nvim_create_autocmd({ 'BufReadPost', 'BufWritePost', 'TextChanged' }, {
+  -- BufEnter 不可或缺：vv-explorer 经预览(在非 nested 的 CursorMoved 回调里 bufload)打开文件时，
+  -- bufload 的 BufReadPost 被 autocmd 嵌套规则吞掉，真正打开(promote)只触发 BufEnter。
+  -- 没有 BufEnter 这一项，经文件树打开的 package.json 不会被打 sign。
+  vim.api.nvim_create_autocmd({ 'BufReadPost', 'BufEnter', 'BufWritePost', 'TextChanged' }, {
     group = aug,
     pattern = patterns,
     callback = function(args)

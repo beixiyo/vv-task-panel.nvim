@@ -58,6 +58,12 @@ end
 ---@param on_update fun()  任务状态变化时的回调，给 UI 用
 ---@return TaskRecord
 function M.run(group, task, on_update)
+  -- 跑新实例前,回收同 (group,task) 的已结束旧记录(隐藏 buffer / 局部 autocmd / core.tasks 条目),避免重跑累积泄漏
+  -- 回收路径单一:仅 dispose 负责,prune_finished 只筛选待回收项
+  for _, stale in ipairs(core.prune_finished(group.id, task.name)) do
+    M.dispose(stale)
+  end
+
   local buf = vim.api.nvim_create_buf(false, true)
   vim.bo[buf].bufhidden = 'hide'
 
@@ -102,14 +108,31 @@ function M.run(group, task, on_update)
     end,
   }
   if rec.env then jopts.env = rec.env end
-  rec.job_id = vim.fn.jobstart(rec.argv, jopts)
+  -- jobstart 在命令不可执行时会抛 E475(而非返回负值),必须 pcall 兜底,否则 on_exit 永不触发、状态卡死 running
+  local ok, job = pcall(vim.fn.jobstart, rec.argv, jopts)
+  if not ok or type(job) ~= 'number' or job <= 0 then
+    rec.status = 'failed'
+    rec.exit_code = -1
+    rec.ended_at = vim.uv.now()
+    vim.notify(string.format('[vv-task-panel] 任务启动失败: %s', rec.cmd), vim.log.levels.ERROR)
+    -- job 没起来,关掉刚开的空终端窗口并把焦点还给原窗口,避免停留在空 buffer
+    if term_win and vim.api.nvim_win_is_valid(term_win) then
+      pcall(vim.api.nvim_win_close, term_win, true)
+    end
+    if vim.api.nvim_win_is_valid(cur_win) then
+      vim.api.nvim_set_current_win(cur_win)
+    end
+    if on_update then on_update() end
+    return rec
+  end
+  rec.job_id = job
 
   -- jobstart(term=true) 会重置 buffer 选项,再次强制 hide 避免关窗时被 wipe 导致 job 被杀
   vim.bo[buf].bufhidden = 'hide'
   vim.bo[buf].buflisted = false
 
-  -- 进入任务窗口(或重新显示)时自动把光标打到末尾,新输出就会跟着走
-  vim.api.nvim_create_autocmd({ 'BufWinEnter', 'WinEnter' }, {
+  -- 进入任务窗口(或重新显示)时自动把光标打到末尾,新输出就会跟着走;保存 id 以便 dispose 时清理,避免泄漏
+  rec._au = vim.api.nvim_create_autocmd({ 'BufWinEnter', 'WinEnter' }, {
     buffer = buf,
     callback = function()
       local w = vim.fn.bufwinid(buf)
@@ -154,6 +177,11 @@ end
 ---@param rec TaskRecord
 function M.dispose(rec)
   M.stop(rec)
+  -- 清理 buffer 局部 autocmd,否则隐藏 buffer 删除后 autocmd 仍残留累积
+  if rec._au then
+    pcall(vim.api.nvim_del_autocmd, rec._au)
+    rec._au = nil
+  end
   core.tasks[rec.id] = nil
   if vim.api.nvim_buf_is_valid(rec.buf) then
     pcall(vim.api.nvim_buf_delete, rec.buf, { force = true })

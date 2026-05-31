@@ -96,6 +96,7 @@ M.groups = {}
 ---@field exit_code? integer
 ---@field started_at integer epoch ms
 ---@field ended_at? integer   on_exit 时置位,让 UI 冻结 elapsed
+---@field _au? integer        BufWinEnter/WinEnter autocmd id,dispose 时 nvim_del_autocmd 清理
 
 ---@type table<integer, TaskRecord>
 M.tasks = {}
@@ -170,6 +171,49 @@ function M.find_recent_task(group_id, task_name)
     end
   end
   return latest
+end
+
+---挑出同 (group,task) 中【需回收】的已结束旧记录:保留最近一条已结束记录,其余返回给调用方 dispose
+---只负责筛选,不动 buffer/autocmd/M.tasks,实际回收交由 run.dispose 单一负责,避免重复回收
+---@param group_id string
+---@param task_name string
+---@return TaskRecord[]  待回收的旧记录(不含保留的那条 / 不含 running 记录)
+function M.prune_finished(group_id, task_name)
+  -- 先找出同组同任务里最近一条已结束记录,作为「保留」基准
+  local keep
+  for _, t in pairs(M.tasks) do
+    if t.group_id == group_id and t.task_name == task_name and t.status ~= 'running' then
+      if not keep or t.started_at > keep.started_at then keep = t end
+    end
+  end
+
+  -- 其余已结束记录全部回收(running 的不碰)
+  local stale = {}
+  for _, t in pairs(M.tasks) do
+    if t.group_id == group_id and t.task_name == task_name
+      and t.status ~= 'running' and t ~= keep then
+      stale[#stale + 1] = t
+    end
+  end
+  return stale
+end
+
+---按 lockfile 探测包管理器：从 pkg_dir 起逐级向上找锁文件，命中即返回
+---探测顺序固定：pnpm-lock.yaml → bun.lockb/bun.lock → yarn.lock → package-lock.json
+---@param pkg_dir string
+---@return 'pnpm' | 'yarn' | 'bun' | 'npm'
+function M.detect_pm(pkg_dir)
+  local dir = pkg_dir
+  while dir and dir ~= '/' and dir ~= '' do
+    if vim.uv.fs_stat(dir .. '/pnpm-lock.yaml') then return 'pnpm' end
+    if vim.uv.fs_stat(dir .. '/bun.lockb') or vim.uv.fs_stat(dir .. '/bun.lock') then return 'bun' end
+    if vim.uv.fs_stat(dir .. '/yarn.lock') then return 'yarn' end
+    if vim.uv.fs_stat(dir .. '/package-lock.json') then return 'npm' end
+    local parent = vim.fn.fnamemodify(dir, ':h')
+    if parent == dir then break end
+    dir = parent
+  end
+  return 'npm'
 end
 
 ---获取当前配置（只读副本）

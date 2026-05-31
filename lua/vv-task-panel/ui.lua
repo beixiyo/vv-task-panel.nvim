@@ -231,17 +231,29 @@ local function create_panel_buf()
   local map = function(lhs, rhs, desc)
     vim.keymap.set('n', lhs, rhs, { buffer = buf, silent = true, nowait = true, desc = desc })
   end
-  map('<CR>',  on_enter,                 'run/toggle')
-  map('<Tab>', on_tab,                   'toggle fold')
-  map('r',     function() M.refresh() end, 'rescan')
-  map('R',     function() expand_all(true) end,  'expand all')
-  map('M',     function() expand_all(false) end, 'collapse all')
-  map('q',     function() M.close_panel() end, 'close')
-  map('<Esc>', function() M.close_panel() end, 'close')
-  map('t',     function() M.open_tasklist() end, 'task list')
-  map('?',     function() M.show_help() end, 'help')
+  map('<CR>',  on_enter,                 'vv-task-panel: run/toggle')
+  map('<Tab>', on_tab,                   'vv-task-panel: toggle fold')
+  map('r',     function() M.refresh() end, 'vv-task-panel: rescan')
+  map('R',     function() expand_all(true) end,  'vv-task-panel: expand all')
+  map('M',     function() expand_all(false) end, 'vv-task-panel: collapse all')
+  map('q',     function() M.close_panel() end, 'vv-task-panel: close')
+  map('<Esc>', function() M.close_panel() end, 'vv-task-panel: close')
+  map('t',     function() M.open_tasklist() end, 'vv-task-panel: task list')
+  map('?',     function() M.show_help() end, 'vv-task-panel: help')
 
   return buf
+end
+
+-- 共享清理:stop+close _uptime_timer 并复位 panel 引用
+-- 供 close_panel(主动关闭) 与 BufWipeout(外部命令关闭) 两处复用
+local function cleanup_panel()
+  if M._uptime_timer then
+    M._uptime_timer:stop()
+    M._uptime_timer:close()
+    M._uptime_timer = nil
+  end
+  panel.win = nil
+  panel.buf = nil  -- bufhidden=wipe 已自动销毁,清掉引用
 end
 
 function M.open_panel()
@@ -268,6 +280,16 @@ function M.open_panel()
   vim.wo[panel.win].statusline = ' '
   vim.wo[panel.win].winhighlight = 'Normal:NormalFloat,CursorLine:PmenuSel,EndOfBuffer:NonText'
 
+  -- buffer 被外部命令(:q / <C-w>c / :only)清除时也要兜底清理 timer + 复位引用,
+  -- 否则 _uptime_timer 永不 stop+close,造成 uv handle 泄漏(参照 tasklist 的 BufWipeout)
+  vim.api.nvim_create_autocmd('BufWipeout', {
+    buffer = panel.buf,
+    once = true,
+    callback = function()
+      cleanup_panel()
+    end,
+  })
+
   render_panel()
 
   if not M._uptime_timer then
@@ -282,16 +304,10 @@ function M.open_panel()
 end
 
 function M.close_panel()
-  if M._uptime_timer then
-    M._uptime_timer:stop()
-    M._uptime_timer:close()
-    M._uptime_timer = nil
-  end
   if panel.win and vim.api.nvim_win_is_valid(panel.win) then
     vim.api.nvim_win_close(panel.win, true)
   end
-  panel.win = nil
-  panel.buf = nil  -- bufhidden=wipe 已自动销毁,清掉引用
+  cleanup_panel()
 end
 
 function M.toggle_panel()
@@ -309,19 +325,9 @@ function M.refresh()
 end
 
 function M.show_help()
-  local lines = {
-    '# vv-task-panel',
-    '',
-    '<CR>    运行 task / 展开组 / 聚焦运行中的任务',
-    '<Tab>   折叠/展开当前组',
-    'r       重新扫描 workspace',
-    'R       展开全部',
-    'M       折叠全部',
-    't       打开任务列表',
-    'q       关闭面板',
-    '?       本帮助',
-  }
-  vim.lsp.util.open_floating_preview(lines, 'markdown', { border = 'rounded', title = ' Help ' })
+  -- 委托给 vv-utils.help_panel,保持各面板帮助风格统一
+  if not panel.buf or not vim.api.nvim_buf_is_valid(panel.buf) then return end
+  require('vv-task-panel.help').open(panel.buf)
 end
 
 -- ============================================================
