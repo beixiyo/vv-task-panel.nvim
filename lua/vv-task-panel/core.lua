@@ -150,10 +150,15 @@ function M.discover(root)
     end
   end
 
+  -- 全序且 nil 安全：nil 视作 ''，仅当恰好一侧为 (root) 时才把它排前面，
+  -- 保证 comp(a,b) 与 comp(b,a) 不会同时为真（满足严格弱序）
   table.sort(groups, function(a, b)
-    if a.rel_dir == '(root)' then return true end
-    if b.rel_dir == '(root)' then return false end
-    return a.rel_dir < b.rel_dir
+    local ar = a.rel_dir or ''
+    local br = b.rel_dir or ''
+    local a_root = ar == '(root)'
+    local b_root = br == '(root)'
+    if a_root ~= b_root then return a_root end
+    return ar < br
   end)
   M.groups = groups
   return groups

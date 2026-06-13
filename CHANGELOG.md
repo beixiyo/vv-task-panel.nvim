@@ -15,6 +15,8 @@
 - 任务面板帮助浮窗（按 `?`）改用统一的 vv-utils 帮助面板渲染，风格与 vv-git / vv-explorer 一致
 - 统一包管理器探测（`detect_pm` 下沉到 core），消除 sign 行与面板 badge 对同一脚本判定不同包管理器的隐患
 - 经文件树（vv-explorer 等预览式打开）首次打开 `package.json` / `deno.json` 时也能渲染脚本运行标记：sign autocmd 增加 `BufEnter`，不再因预览 `bufload` 的 `BufReadPost` 被 autocmd 嵌套规则吞掉而漏打
+- 脚本行解析改为逐行 `gmatch` 全部 key 并扫描 `"scripts":` 声明行本身，与 `"scripts": {` 同行书写的内联脚本、以及压缩成单行的 `package.json` 不再漏打运行标记
+- `core.discover()` 的分组排序比较器改为全序且 nil 安全（nil 视作 `''`，仅一侧为 `(root)` 时才排前），自定义 provider 产出多个 `(root)` 或缺省 `rel_dir` 时不再触发 `invalid order function for sorting` / `attempt to compare nil with string` 导致面板打不开
 
 ## 2025-05-22
 

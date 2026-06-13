@@ -117,20 +117,29 @@ local function json_section_parser(section_key, make_entry)
     -- 命中且尚未定位的真实 key 才打 sign，所有 key 找齐即停
     local in_section = false
     for i, line in ipairs(lines) do
+      -- 同一物理行内（含 section 声明行本身）扫描所有 key，兼容内联/压缩 JSON
+      local scan_from = 1
       if not in_section then
-        if line:match('"' .. section_key .. '"%s*:') then in_section = true end
-      else
-        local name = line:match('"([^"]+)"%s*:')
-        if name and valid[name] then
-          valid[name] = nil
-          pending = pending - 1
-          local entry = make_entry(name, dir)
-          if entry then
-            entry.lnum = i
-            result[#result + 1] = entry
-          end
-          if pending == 0 then break end
+        local _, e = line:find('"' .. section_key .. '"%s*:')
+        if e then
+          in_section = true
+          scan_from = e + 1  -- 从 marker 之后开始扫，避免把 section_key 自身当成 key
         end
+      end
+      if in_section then
+        for name in line:sub(scan_from):gmatch('"([^"]+)"%s*:') do
+          if valid[name] then
+            valid[name] = nil
+            pending = pending - 1
+            local entry = make_entry(name, dir)
+            if entry then
+              entry.lnum = i
+              result[#result + 1] = entry
+            end
+            if pending == 0 then break end
+          end
+        end
+        if pending == 0 then break end
       end
     end
 
