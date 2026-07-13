@@ -1,98 +1,103 @@
-<h1 align="center">vv-task-panel.nvim</h1>
+<div align="center">
 
-<p align="center">
-  <em>可扩展的任务面板 — 自动发现项目脚本、终端运行、monorepo 支持</em>
-</p>
+# vv-task-panel.nvim
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Neovim-0.10+-57A143?style=flat-square&logo=neovim&logoColor=white" alt="Requires Neovim 0.10+" />
-  <img src="https://img.shields.io/badge/Lua-2C2D72?style=flat-square&logo=lua&logoColor=white" alt="Lua" />
-</p>
+English | <a href="./README.zh-CN.md">中文</a>
+
+<img src="./docs/assets/vv-task-panel.png" alt="vv-task-panel demo" width="900" />
+
+Want my Neovim config? See <a href="https://github.com/beixiyo/dotfiles">dotfiles</a>.
+
+<em>An extensible task panel with project-script discovery, terminal execution, and monorepo support</em>
+
+<br />
+
+<img src="https://img.shields.io/badge/Neovim-0.10+-57A143?style=flat-square&logo=neovim&logoColor=white" alt="Requires Neovim 0.10+" />
+<img src="https://img.shields.io/badge/Lua-2C2D72?style=flat-square&logo=lua&logoColor=white" alt="Lua" />
+
+</div>
 
 ---
 
-## 安装
+## Requirements
+
+Task discovery itself is implemented in Lua. Running a discovered script requires the package manager selected from the nearest lockfile:
+
+- [pnpm](https://github.com/pnpm/pnpm) for `pnpm-lock.yaml`
+- [Bun](https://github.com/oven-sh/bun) for `bun.lockb` or `bun.lock`
+- [Yarn](https://github.com/yarnpkg/berry) for `yarn.lock`
+- [npm](https://github.com/npm/cli) for `package-lock.json`, or when no supported lockfile is found
+- [Deno](https://github.com/denoland/deno) only when using a custom Deno task provider
+
+## Installation
 
 ```lua
 {
   'beixiyo/vv-task-panel.nvim',
   dependencies = {
     'beixiyo/vv-utils.nvim',
-    { 'beixiyo/vv-statuscol.nvim', optional = true },  -- 鼠标点击 sign 运行任务需要此插件
+    { 'beixiyo/vv-statuscol.nvim', optional = true },
   },
   cmd = { 'VVTaskPanel', 'VVTaskPanelOpen' },
   ---@type VVTaskPanelConfig
   opts = {
-    width = 44,                     -- 面板宽度
-    position = 'right',             -- 'left' | 'right'
-    exclude_dirs = {                -- 扫描时跳过的目录
+    width = 44,
+    position = 'right',
+    exclude_dirs = {
       'node_modules', '.git', 'dist', 'build', '.next',
       '.turbo', '.cache', 'coverage', '.nuxt', 'out',
     },
-    scan_strategy = 'workspace',    -- 'workspace'（读 workspace 定义）| 'walk'（递归遍历）
-    max_depth = 8,                  -- walk 策略的最大递归深度
-    term_position = 'bottom',       -- 任务终端位置：'bottom' | 'right' | 'float'
-    term_height = 15,               -- bottom 模式下终端高度
-    term_width = 80,                -- right 模式下终端宽度
-    providers = nil,                -- Provider 白名单（nil = 启用所有已注册的）
+    scan_strategy = 'workspace',
+    max_depth = 8,
+    term_position = 'bottom',
+    term_height = 15,
+    term_width = 80,
+    providers = nil,
     icons = {
-      pkg_open   = '',
-      pkg_closed = '',
-      package    = '󰏖',
-      running    = '●',
-      success    = '',
-      failed     = '',
-      stopped    = '●',
-      pending    = '',
-      header     = '󰆍',
-      arrow      = '→',
-      run        = '',  -- statuscolumn idle 状态图标
+      pkg_open = '', pkg_closed = '', package = '󰏖', running = '●',
+      success = '', failed = '', stopped = '●', pending = '',
+      header = '󰆍', arrow = '→', run = '',
     },
-    sign = {                          -- statuscolumn 脚本行标记（按状态配置）
-      idle    = { hl = 'VVTaskSignIdle' },
-      running = { hl = 'VVTaskSignRunning' },
-      success = { hl = 'VVTaskSignSuccess' },
-      failed  = { hl = 'VVTaskSignFailed' },
+    sign = {
+      idle = { hl = 'VVTaskSignIdle' }, running = { hl = 'VVTaskSignRunning' },
+      success = { hl = 'VVTaskSignSuccess' }, failed = { hl = 'VVTaskSignFailed' },
       stopped = { hl = 'VVTaskSignStopped' },
     },
   },
 }
 ```
 
-## 配置
+## Configuration
 
-| 选项 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `width` | `integer` | `44` | 面板宽度 |
-| `position` | `'left' \| 'right'` | `'right'` | 面板位置 |
-| `exclude_dirs` | `string[]` | `{ 'node_modules', '.git', ... }` | 扫描时跳过的目录 |
-| `scan_strategy` | `'workspace' \| 'walk'` | `'workspace'` | `workspace`：读 `pnpm-workspace.yaml` / `package.json` workspaces；`walk`：递归遍历 |
-| `max_depth` | `integer` | `8` | `walk` 策略最大递归深度 |
-| `term_position` | `'bottom' \| 'right' \| 'float'` | `'bottom'` | 任务终端窗口位置 |
-| `term_height` | `integer` | `15` | `bottom` 模式下终端高度 |
-| `term_width` | `integer` | `80` | `right` 模式下终端宽度 |
-| `providers` | `string[]?` | `nil` | Provider 白名单；`nil` 启用所有已注册 |
-| `icons` | `table<string, string>` | *见上方* | 图标配置，可逐项覆盖 |
-| `sign` | `table<string, VVTaskSignState>` | *见上方* | Statuscolumn 标记按状态配置 icon / hl |
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `width` | `integer` | `44` | Panel width |
+| `position` | `'left' \| 'right'` | `'right'` | Panel side |
+| `exclude_dirs` | `string[]` | `{ 'node_modules', '.git', ... }` | Directories skipped while scanning |
+| `scan_strategy` | `'workspace' \| 'walk'` | `'workspace'` | Read workspace definitions or recursively walk directories |
+| `max_depth` | `integer` | `8` | Maximum depth for the walk strategy |
+| `term_position` | `'bottom' \| 'right' \| 'float'` | `'bottom'` | Task terminal placement |
+| `term_height` | `integer` | `15` | Terminal height in bottom mode |
+| `term_width` | `integer` | `80` | Terminal width in right mode |
+| `providers` | `string[]?` | `nil` | Provider allowlist; `nil` enables every registered provider |
+| `icons` | `table<string, string>` | See above | Individually overridable icons |
+| `sign` | `table<string, VVTaskSignState>` | See above | Status-column icon and highlight settings by state |
 
-## Statuscolumn Signs
+## Status-column signs
 
-打开 `package.json` / `deno.json` 时，脚本行的 statuscolumn 自动显示可运行标记，标记随任务状态实时变化：
+When `package.json` or `deno.json` is open, executable script lines receive status-column signs that update with task state.
 
-| 状态 | 图标 | 颜色 | 说明 |
-|------|------|------|------|
-| idle | `icons.run` | 蓝 (`DiagnosticInfo`) | 未运行，可点击执行 |
-| running | `icons.running` | 绿 (`DiagnosticOk`) | 运行中，点击聚焦终端 |
-| success | `icons.success` | 绿 (`DiagnosticOk`) | 运行成功 |
-| failed | `icons.failed` | 红 (`DiagnosticError`) | 运行失败 |
-| stopped | `icons.stopped` | 红 (`DiagnosticError`) | 手动终止 |
+| State | Icon | Color | Behavior |
+|---|---|---|---|
+| idle | `icons.run` | Blue (`DiagnosticInfo`) | Ready to run |
+| running | `icons.running` | Green (`DiagnosticOk`) | Running; clicking focuses the terminal |
+| success | `icons.success` | Green (`DiagnosticOk`) | Completed successfully |
+| failed | `icons.failed` | Red (`DiagnosticError`) | Failed |
+| stopped | `icons.stopped` | Red (`DiagnosticError`) | Stopped manually |
 
-**运行方式**：
+Run a task by clicking its gutter sign when `vv-statuscol.nvim` is installed, or place the cursor on the script line and press `gx` or run `:VVTaskPanelRunLine`.
 
-- 鼠标点击 gutter 区域的标记图标（需安装 [vv-statuscol.nvim](https://github.com/beixiyo/vv-statuscol.nvim)，未安装时点击无效）
-- 光标移到脚本行，按 `gx` 或执行 `:VVTaskPanelRunLine`
-
-**覆盖单个状态的图标 / 高亮**：
+Override a state independently:
 
 ```lua
 opts = {
@@ -102,11 +107,11 @@ opts = {
 }
 ```
 
-未设置 `icon` 的状态自动复用 `icons` 表同名项。
+A state without an explicit `icon` reuses the same-named entry from `icons`.
 
-### 自定义 Sign Parser
+### Custom sign parser
 
-为新文件类型注册脚本行解析器，即可在 statuscolumn 显示运行标记：
+Register a parser for another file type to expose executable lines in the status column:
 
 ```lua
 require('vv-task-panel').register_sign_parser('Cargo.toml', function(buf)
@@ -129,13 +134,11 @@ require('vv-task-panel').register_sign_parser('Cargo.toml', function(buf)
 end)
 ```
 
----
+### Built-in npm provider
 
-### 内置 npm Provider
+The built-in provider scans `package.json` and selects pnpm, Bun, Yarn, or npm from the lockfile. The workspace strategy expands packages from `pnpm-workspace.yaml` or the `workspaces` field in `package.json`.
 
-自动扫描 `package.json`，按 lockfile 选择包管理器（pnpm / bun / yarn / npm）。`workspace` 策略读取 `pnpm-workspace.yaml` 或 `package.json` 的 `workspaces` 字段展开子包。
-
-### 自定义 Provider
+### Custom provider
 
 ```lua
 require('vv-task-panel').register_provider({
