@@ -424,7 +424,7 @@ function M.render_tasklist()
   end
 
   lines[#lines + 1] = ''
-  local footer = '  <CR> open · d stop · D remove · r restart · q close'
+  local footer = '  Open ↵ · Stop d · Remove ⇧D · Restart r · Close q'
   lines[#lines + 1] = footer
   add_mark(#lines - 1, 0, #footer, 'VVTaskPanelFooter')
 
