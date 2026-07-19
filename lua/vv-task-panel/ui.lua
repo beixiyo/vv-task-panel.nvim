@@ -217,7 +217,7 @@ local function create_panel_buf()
   local buf = vim.api.nvim_create_buf(false, true)
   vim.bo[buf].bufhidden = 'wipe'  -- 面板关闭即销毁,下次重建,避免 E95 同名冲突
   vim.bo[buf].buftype = 'nofile'
-  vim.bo[buf].filetype = 'task-panel'
+  vim.bo[buf].filetype = 'vv-task-panel'
   vim.bo[buf].swapfile = false
   vim.bo[buf].buflisted = false
   local name = 'task-panel://' .. vim.fn.getcwd()
@@ -454,7 +454,7 @@ function M.open_tasklist()
   tasklist.buf = vim.api.nvim_create_buf(false, true)
   vim.bo[tasklist.buf].bufhidden = 'wipe'
   vim.bo[tasklist.buf].buftype = 'nofile'
-  vim.bo[tasklist.buf].filetype = 'task-panel-tasks'
+  vim.bo[tasklist.buf].filetype = 'vv-task-panel-tasks'
 
   local w = math.floor(vim.o.columns * 0.5)
   local h = math.floor(vim.o.lines * 0.4)

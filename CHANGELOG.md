@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.1] - 2026-07-19
+
+### Changed
+
+- 主面板与任务列表的 filetype 统一加 `vv-` 命名空间，分别改为 `vv-task-panel` 与 `vv-task-panel-tasks`，避免与其他任务面板发生名称冲突
+
 ## [0.1.0] - 2026-07-13
 
 ### Fixed

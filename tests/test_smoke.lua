@@ -21,6 +21,38 @@ local function eq(a, b, msg)
   end
 end
 
+local source = debug.getinfo(1, 'S').source:sub(2)
+local plugin_root = vim.fn.fnamemodify(source, ':p:h:h')
+local utils_root = vim.fn.fnamemodify(plugin_root, ':h') .. '/vv-utils.nvim'
+
+vim.opt.runtimepath:prepend(utils_root)
+vim.opt.runtimepath:prepend(plugin_root)
+
+print('\n[FILETYPE] 私有面板使用命名空间 filetype')
+
+test('公开 API 创建的两个面板使用 vv- 前缀', function()
+  local task = require('vv-task-panel')
+  local cwd = vim.fn.getcwd()
+  local tmp_dir = vim.fn.tempname()
+  vim.fn.mkdir(tmp_dir, 'p')
+  vim.cmd.cd(vim.fn.fnameescape(tmp_dir))
+
+  task.setup({ providers = {} })
+  task.open()
+  local panel_ft = vim.bo.filetype
+
+  task.tasks()
+  local tasks_ft = vim.bo.filetype
+  vim.api.nvim_win_close(0, true)
+  task.close()
+
+  vim.cmd.cd(vim.fn.fnameescape(cwd))
+  vim.fn.delete(tmp_dir, 'rf')
+
+  eq(panel_ft, 'vv-task-panel', 'main panel filetype')
+  eq(tasks_ft, 'vv-task-panel-tasks', 'task list filetype')
+end)
+
 -- ─── FIX 7: vim.b 存储改为模块级变量 ───────────────────────────────────
 
 print('\n[FIX 7] task_lines 存储方式')
