@@ -67,8 +67,7 @@ function M.run(group, task, on_update)
   local buf = vim.api.nvim_create_buf(false, true)
   vim.bo[buf].bufhidden = 'hide'
 
-  local id = core._next_task_id
-  core._next_task_id = id + 1
+  local id = core.allocate_task_id()
   vim.api.nvim_buf_set_name(buf, string.format('task://%s/%s#%d', group.name, task.name, id))
 
   ---@type TaskRecord
@@ -85,7 +84,7 @@ function M.run(group, task, on_update)
     status = 'running',
     started_at = vim.uv.now(),
   }
-  core.tasks[id] = rec
+  core.add_task(rec)
 
   local cur_win = vim.api.nvim_get_current_win()
   local term_win = open_term_win(buf, string.format(' %s ▸ %s ', group.name, task.name))
@@ -182,7 +181,7 @@ function M.dispose(rec)
     pcall(vim.api.nvim_del_autocmd, rec._au)
     rec._au = nil
   end
-  core.tasks[rec.id] = nil
+  core.remove_task(rec.id)
   if vim.api.nvim_buf_is_valid(rec.buf) then
     pcall(vim.api.nvim_buf_delete, rec.buf, { force = true })
   end

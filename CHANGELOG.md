@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.1.2] - 2026-07-26
+
+### Added
+
+- 主面板改用 `vv-utils.tree_panel`
+- 新增 `state`、`mappings`、`render`、`help` 与 `on_attach` 配置，可注入持久状态并覆盖主面板交互和渲染
+
+### Changed
+
+- 配置、provider 注册、任务发现、包管理器探测和运行记录拆分为独立 owner
+- 任务历史浮窗与高亮定义从主 UI 模块拆分，删除已由通用 tree panel 取代的旧帮助模块
+- Provider 发现顺序改为按 `priority` 降序、名称升序执行，不再依赖 Lua table 的无序遍历
+
+### Fixed
+
+- 重复 `setup()` 或 `disable()` 会释放旧的 statuscolumn 点击订阅、autocmd 与插件拥有的 buffer-local 快捷键，且不会删除后来由其他插件覆盖的映射
+- 内置 `package.json` / `deno.json` parser 只在对应 JSON filetype 生效；自定义 parser 仍保持 filetype 无关
+- 重复 `setup()` 会销毁旧 tree panel 实例，使新的宽度、位置、状态、渲染器、快捷键和帮助配置实际生效
+- `disable()` 会同时关闭主面板、任务历史浮窗及其计时器，不再残留 UI 资源
+- `setup()` 后注册的 sign parser 会立即安装自己的 buffer 事件，无需再次 setup
+- JSON / JSONC 脚本行使用字符串与嵌套结构感知的 token 定位，命令字符串中的类 key 文本不再抢占真实脚本位置
+- 用户配置与解析后配置使用独立类型，允许只传需要覆盖的字段
+
 ## [0.1.1] - 2026-07-19
 
 ### Changed

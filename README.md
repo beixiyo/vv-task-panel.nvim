@@ -43,6 +43,9 @@ Task discovery itself is implemented in Lua. Running a discovered script require
   opts = {
     width = 44,
     position = 'right',
+    state = nil,              -- Optional VVStateHandle; defaults to vv-task-panel/main
+    mappings = {},            -- Override vv-utils tree_panel mappings
+    render = {},              -- Override winbar/header/node/empty renderers
     exclude_dirs = {
       'node_modules', '.git', 'dist', 'build', '.next',
       '.turbo', '.cache', 'coverage', '.nuxt', 'out',
@@ -71,8 +74,13 @@ Task discovery itself is implemented in Lua. Running a discovered script require
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `width` | `integer` | `44` | Panel width |
+| `width` | `integer` | `44` | Initial panel width; manual resize is persisted through `vv-utils.state` |
 | `position` | `'left' \| 'right'` | `'right'` | Panel side |
+| `state` | `VVStateHandle?` | `nil` | Optional state container; defaults to `vv-task-panel/main` |
+| `mappings` | `VVTreePanelMappings` | `{}` | Override or disable shared tree-panel mappings |
+| `render` | `VVTreePanelRenderers` | `{}` | Override `winbar`, `header`, `node`, or `empty` rendering |
+| `help` | `false \| VVTreePanelHelpOptions` | `nil` | Customize or disable the shared `g?` help panel |
+| `on_attach` | `fun(panel, buf)?` | `nil` | Add caller-owned buffer behavior after default mappings |
 | `exclude_dirs` | `string[]` | `{ 'node_modules', '.git', ... }` | Directories skipped while scanning |
 | `scan_strategy` | `'workspace' \| 'walk'` | `'workspace'` | Read workspace definitions or recursively walk directories |
 | `max_depth` | `integer` | `8` | Maximum depth for the walk strategy |
@@ -118,6 +126,7 @@ require('vv-task-panel').register_sign_parser('Cargo.toml', function(buf)
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   local dir = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ':h')
   local result = {}
+
   for i, line in ipairs(lines) do
     local name = line:match('^name%s*=%s*"([^"]+)"')
     if name then
@@ -143,17 +152,21 @@ The built-in provider scans `package.json` and selects pnpm, Bun, Yarn, or npm f
 ```lua
 require('vv-task-panel').register_provider({
   name = 'deno',
+  priority = 10, -- Higher values run first; equal priorities sort by name
   detect = function(root, cfg)
     return vim.fs.find('deno.json', { path = root, type = 'file', limit = math.huge })
   end,
   parse = function(path, cfg)
     local ok, data = pcall(vim.json.decode, table.concat(vim.fn.readfile(path), '\n'))
     if not ok or type(data.tasks) ~= 'table' then return nil end
+
     local dir = vim.fn.fnamemodify(path, ':h')
     local tasks = {}
+
     for name, cmd in pairs(data.tasks) do
       tasks[#tasks + 1] = { name = name, argv = { 'deno', 'task', name }, cmd = cmd }
     end
+
     return {
       id = path, name = data.name or vim.fn.fnamemodify(dir, ':.'),
       dir = dir, rel_dir = vim.fn.fnamemodify(dir, ':.'),

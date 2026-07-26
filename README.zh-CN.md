@@ -42,6 +42,9 @@
   opts = {
     width = 44,                     -- 面板宽度
     position = 'right',             -- 'left' | 'right'
+    state = nil,                    -- 可选 VVStateHandle；默认 vv-task-panel/main
+    mappings = {},                  -- 覆盖 vv-utils tree_panel 快捷键
+    render = {},                    -- 覆盖 winbar/header/node/empty 渲染
     exclude_dirs = {                -- 扫描时跳过的目录
       'node_modules', '.git', 'dist', 'build', '.next',
       '.turbo', '.cache', 'coverage', '.nuxt', 'out',
@@ -80,8 +83,13 @@
 
 | 选项 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `width` | `integer` | `44` | 面板宽度 |
+| `width` | `integer` | `44` | 面板初始宽度；手动 resize 后通过 `vv-utils.state` 持久化 |
 | `position` | `'left' \| 'right'` | `'right'` | 面板位置 |
+| `state` | `VVStateHandle?` | `nil` | 可选状态容器；默认注册 `vv-task-panel/main` |
+| `mappings` | `VVTreePanelMappings` | `{}` | 覆盖或禁用通用 tree-panel 快捷键 |
+| `render` | `VVTreePanelRenderers` | `{}` | 覆盖 `winbar`、`header`、`node` 或 `empty` 渲染 |
+| `help` | `false \| VVTreePanelHelpOptions` | `nil` | 自定义或禁用通用 `g?` 帮助面板 |
+| `on_attach` | `fun(panel, buf)?` | `nil` | 默认快捷键注册后追加调用方自己的 buffer 行为 |
 | `exclude_dirs` | `string[]` | `{ 'node_modules', '.git', ... }` | 扫描时跳过的目录 |
 | `scan_strategy` | `'workspace' \| 'walk'` | `'workspace'` | `workspace`：读 `pnpm-workspace.yaml` / `package.json` workspaces；`walk`：递归遍历 |
 | `max_depth` | `integer` | `8` | `walk` 策略最大递归深度 |
@@ -119,7 +127,7 @@ opts = {
 }
 ```
 
-未设置 `icon` 的状态自动复用 `icons` 表同名项。
+未设置 `icon` 的状态自动复用 `icons` 表同名项
 
 ### 自定义 Sign Parser
 
@@ -130,6 +138,7 @@ require('vv-task-panel').register_sign_parser('Cargo.toml', function(buf)
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   local dir = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ':h')
   local result = {}
+
   for i, line in ipairs(lines) do
     local name = line:match('^name%s*=%s*"([^"]+)"')
     if name then
@@ -150,24 +159,28 @@ end)
 
 ### 内置 npm Provider
 
-自动扫描 `package.json`，按 lockfile 选择包管理器（pnpm / bun / yarn / npm）。`workspace` 策略读取 `pnpm-workspace.yaml` 或 `package.json` 的 `workspaces` 字段展开子包。
+自动扫描 `package.json`，按 lockfile 选择包管理器（pnpm / bun / yarn / npm）。`workspace` 策略读取 `pnpm-workspace.yaml` 或 `package.json` 的 `workspaces` 字段展开子包
 
 ### 自定义 Provider
 
 ```lua
 require('vv-task-panel').register_provider({
   name = 'deno',
+  priority = 10, -- 数值越大越先执行，同优先级按名称排序
   detect = function(root, cfg)
     return vim.fs.find('deno.json', { path = root, type = 'file', limit = math.huge })
   end,
   parse = function(path, cfg)
     local ok, data = pcall(vim.json.decode, table.concat(vim.fn.readfile(path), '\n'))
     if not ok or type(data.tasks) ~= 'table' then return nil end
+
     local dir = vim.fn.fnamemodify(path, ':h')
     local tasks = {}
+
     for name, cmd in pairs(data.tasks) do
       tasks[#tasks + 1] = { name = name, argv = { 'deno', 'task', name }, cmd = cmd }
     end
+
     return {
       id = path, name = data.name or vim.fn.fnamemodify(dir, ':.'),
       dir = dir, rel_dir = vim.fn.fnamemodify(dir, ':.'),

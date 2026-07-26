@@ -4,6 +4,7 @@
 -- 图标复用 config.icons，高亮 / 图标均可通过 config.sign 按状态覆盖
 local core = require('vv-task-panel.core')
 local run_mod = require('vv-task-panel.run')
+local Parsers = require('vv-task-panel.sign.parsers')
 
 local M = {}
 
@@ -14,8 +15,14 @@ local buf_tasks = {}
 
 ---@alias SignParser fun(buf: integer): { lnum: integer, name: string, argv: string[], cwd: string, badge: string }[]
 
----@type table<string, SignParser>
-local parsers = {}
+---@type table<string, VVTaskPanelSignParser>
+local parsers = Parsers.builtins()
+local click_dispose
+local augroup
+local enabled = false
+local generation = 0
+local parser_autocmds = {}
+local install_parser
 
 -- ======================= State style =======================
 
@@ -37,127 +44,6 @@ local function get_style(state)
     hl = s.hl or 'VVTaskSignIdle',
   }
 end
-
--- ======================= JSON section parser =======================
-
--- 串感知地剥离 JSONC 注释（// 行、/* */ 块）与对象/数组的尾随逗号。
--- 字符串字面量内的 // 、/* 、, 不应被剥离，故须跟踪是否处于字符串中并处理转义。
----@param src string
----@return string
-local function strip_jsonc(src)
-  local out = {}
-  local i, n = 1, #src
-  local in_str = false
-
-  while i <= n do
-    local c = src:sub(i, i)
-
-    if in_str then
-      if c == '\\' then
-        out[#out + 1] = src:sub(i, i + 1)  -- 连同被转义字符整体保留
-        i = i + 2
-      else
-        out[#out + 1] = c
-        if c == '"' then in_str = false end
-        i = i + 1
-      end
-    elseif c == '"' then
-      in_str = true
-      out[#out + 1] = c
-      i = i + 1
-    elseif c == '/' and src:sub(i + 1, i + 1) == '/' then
-      while i <= n and src:sub(i, i) ~= '\n' do i = i + 1 end  -- 跳到行尾（保留换行）
-    elseif c == '/' and src:sub(i + 1, i + 1) == '*' then
-      i = i + 2
-      while i <= n and not (src:sub(i, i) == '*' and src:sub(i + 1, i + 1) == '/') do i = i + 1 end
-      i = i + 2  -- 跳过结尾 */
-    else
-      out[#out + 1] = c
-      i = i + 1
-    end
-  end
-
-  -- 去掉对象/数组结束符前的尾随逗号：  , } / , ]
-  return (table.concat(out):gsub(',(%s*[%}%]])', '%1'))
-end
-
----@param section_key string
----@param make_entry fun(name: string, dir: string): { name: string, argv: string[], cwd: string, badge: string }|nil
----@return SignParser
-local function json_section_parser(section_key, make_entry)
-  return function(buf)
-    local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-    local result = {}
-    local dir = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ':h')
-
-    -- 用真正的 JSON 解析拿到 section 下的真实 key 集合，
-    -- 避免靠数花括号判段（script 值里的字面 { } 会破坏计数，误判依赖项为脚本）
-    local raw = table.concat(lines, '\n')
-    local ok, data = pcall(vim.json.decode, raw)
-    -- vim.json.decode 对 JSONC（// 行注释、/* */ 块注释、尾随逗号）一律失败，
-    -- 而 deno.jsonc 显式支持注释——失败时剥离注释/尾逗号后重试，避免对带注释文件不打任何 sign
-    if not ok or type(data) ~= 'table' then
-      ok, data = pcall(vim.json.decode, strip_jsonc(raw))
-    end
-    if not ok or type(data) ~= 'table' then return result end
-
-    local section = data[section_key]
-    if type(section) ~= 'table' then return result end
-
-    -- 只接受 section 内的真实 key，每个 key 仅定位一次
-    local valid = {}
-    local pending = 0
-    for name in pairs(section) do
-      valid[name] = true
-      pending = pending + 1
-    end
-    if pending == 0 then return result end
-
-    -- decode 后按行匹配 key 定位行号：从 "section_key" 声明行起向后扫描，
-    -- 命中且尚未定位的真实 key 才打 sign，所有 key 找齐即停
-    local in_section = false
-    for i, line in ipairs(lines) do
-      -- 同一物理行内（含 section 声明行本身）扫描所有 key，兼容内联/压缩 JSON
-      local scan_from = 1
-      if not in_section then
-        local _, e = line:find('"' .. section_key .. '"%s*:')
-        if e then
-          in_section = true
-          scan_from = e + 1  -- 从 marker 之后开始扫，避免把 section_key 自身当成 key
-        end
-      end
-      if in_section then
-        for name in line:sub(scan_from):gmatch('"([^"]+)"%s*:') do
-          if valid[name] then
-            valid[name] = nil
-            pending = pending - 1
-            local entry = make_entry(name, dir)
-            if entry then
-              entry.lnum = i
-              result[#result + 1] = entry
-            end
-            if pending == 0 then break end
-          end
-        end
-        if pending == 0 then break end
-      end
-    end
-
-    return result
-  end
-end
-
--- ======================= Built-in parsers =======================
-
-parsers['package.json'] = json_section_parser('scripts', function(name, dir)
-  local pm = core.detect_pm(dir)  -- 与 npm provider 共用 core 单一实现，避免判定发散
-  return { name = name, argv = { pm, 'run', name }, cwd = dir, badge = pm }
-end)
-
-parsers['deno.json'] = json_section_parser('tasks', function(name, dir)
-  return { name = name, argv = { 'deno', 'task', name }, cwd = dir, badge = 'deno' }
-end)
-parsers['deno.jsonc'] = parsers['deno.json']
 
 -- ======================= Sign state =======================
 
@@ -208,24 +94,46 @@ end
 
 -- ======================= Sign placement =======================
 
----@type table<integer, boolean>
+---@type table<integer, { lhs:string, callback:function }[]>
 local buf_keymapped = {}
 
-local function bind_buf_keys(buf)
-  if buf_keymapped[buf] then return end
-  buf_keymapped[buf] = true
+local function clear_buf_keys(buf)
+  local keys = buf_keymapped[buf]
+  if not keys then return end
 
+  for _, owned in ipairs(keys) do
+    local current
+    if vim.api.nvim_buf_is_valid(buf) then
+      vim.api.nvim_buf_call(buf, function()
+        current = vim.fn.maparg(owned.lhs, 'n', false, true)
+      end)
+    end
+    if current and current.callback == owned.callback then
+      pcall(vim.keymap.del, 'n', owned.lhs, { buffer = buf })
+    end
+  end
+
+  buf_keymapped[buf] = nil
+end
+
+local function bind_buf_keys(buf, has_entries)
+  clear_buf_keys(buf)
+  if not has_entries then return end
   local keys = (core.get_config().sign or {}).keys
   if not keys then return end
 
+  local installed = {}
   for _, k in ipairs(keys) do
     local lhs = k[1]
     if lhs then
-      vim.keymap.set('n', lhs, function()
+      local callback = function()
         require('vv-task-panel.sign').run_at_cursor()
-      end, { buffer = buf, desc = k.desc or 'Run script' })
+      end
+      vim.keymap.set('n', lhs, callback, { buffer = buf, desc = k.desc or 'Run script' })
+      installed[#installed + 1] = { lhs = lhs, callback = callback }
     end
   end
+  if #installed > 0 then buf_keymapped[buf] = installed end
 end
 
 local function place_signs(buf)
@@ -234,10 +142,16 @@ local function place_signs(buf)
 
   local fname = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ':t')
   local parser = parsers[fname]
-  if not parser then return end
+  if not parser or (parser.filetypes and not parser.filetypes[vim.bo[buf].filetype]) then
+    clear_buf_keys(buf)
+    return
+  end
 
-  local ok, entries = pcall(parser, buf)
-  if not ok or not entries or #entries == 0 then return end
+  local ok, entries = pcall(parser.parse, buf)
+  if not ok or not entries or #entries == 0 then
+    clear_buf_keys(buf)
+    return
+  end
 
   local tasks = {}
 
@@ -258,7 +172,7 @@ local function place_signs(buf)
   end
 
   buf_tasks[buf] = tasks
-  bind_buf_keys(buf)
+  bind_buf_keys(buf, #tasks > 0)
 end
 
 -- ======================= Task lookup & run =======================
@@ -337,61 +251,97 @@ function M.handle_click(pos)
 end
 
 function M.register_parser(filename, parser_fn)
-  parsers[filename] = parser_fn
+  assert(type(filename) == 'string', 'filename must be a string')
+  assert(type(parser_fn) == 'function', 'parser must be a function')
+  parsers[filename] = Parsers.descriptor(filename, nil, parser_fn)
+  if enabled then install_parser(filename, generation) end
 end
 
 -- ======================= Setup =======================
 
+function M.disable()
+  enabled = false
+  generation = generation + 1
+  if augroup then
+    pcall(vim.api.nvim_del_augroup_by_id, augroup)
+    augroup = nil
+  end
+  parser_autocmds = {}
+  if click_dispose then
+    click_dispose()
+    click_dispose = nil
+  end
+  for buf in pairs(buf_keymapped) do clear_buf_keys(buf) end
+  buf_tasks = {}
+end
+
+---@param filename string
+---@param setup_generation integer
+install_parser = function(filename, setup_generation)
+  if parser_autocmds[filename] then
+    pcall(vim.api.nvim_del_autocmd, parser_autocmds[filename])
+  end
+  parser_autocmds[filename] = vim.api.nvim_create_autocmd(
+    { 'BufReadPost', 'BufEnter', 'BufWritePost', 'TextChanged' },
+    {
+      group = augroup,
+      pattern = '*/' .. vim.fn.escape(filename, [[ *?[{\]]),
+      callback = function(args)
+        vim.schedule(function()
+          if enabled
+            and generation == setup_generation
+            and vim.api.nvim_buf_is_valid(args.buf)
+          then
+            place_signs(args.buf)
+          end
+        end)
+      end,
+    }
+  )
+end
+
 function M.setup()
+  M.disable()
+  enabled = true
+  generation = generation + 1
+  local setup_generation = generation
   local function hl(name, link)
     if vim.fn.hlexists(name) == 0 then
       vim.api.nvim_set_hl(0, name, { link = link })
     end
   end
+
   hl('VVTaskSignIdle',    'DiagnosticInfo')
   hl('VVTaskSignRunning', 'DiagnosticOk')
   hl('VVTaskSignSuccess', 'DiagnosticOk')
   hl('VVTaskSignFailed',  'DiagnosticError')
   hl('VVTaskSignStopped', 'DiagnosticError')
 
-  local aug = vim.api.nvim_create_augroup('VVTaskPanelSign', { clear = true })
+  augroup = vim.api.nvim_create_augroup('VVTaskPanelSign', { clear = true })
 
-  local patterns = {}
   for fname in pairs(parsers) do
-    patterns[#patterns + 1] = '*/' .. fname
+    install_parser(fname, setup_generation)
   end
 
-  -- BufEnter 不可或缺：vv-explorer 经预览(在非 nested 的 CursorMoved 回调里 bufload)打开文件时，
-  -- bufload 的 BufReadPost 被 autocmd 嵌套规则吞掉，真正打开(promote)只触发 BufEnter。
-  -- 没有 BufEnter 这一项，经文件树打开的 package.json 不会被打 sign。
-  vim.api.nvim_create_autocmd({ 'BufReadPost', 'BufEnter', 'BufWritePost', 'TextChanged' }, {
-    group = aug,
-    pattern = patterns,
-    callback = function(args)
-      vim.schedule(function()
-        if vim.api.nvim_buf_is_valid(args.buf) then
-          place_signs(args.buf)
-        end
-      end)
-    end,
-  })
-
   vim.api.nvim_create_autocmd('BufWipeout', {
-    group = aug,
+    group = augroup,
     callback = function(args)
       buf_tasks[args.buf] = nil
-      buf_keymapped[args.buf] = nil
+      clear_buf_keys(args.buf)
     end,
   })
 
   vim.api.nvim_create_user_command('VVTaskPanelRunLine', M.run_at_cursor, {
     desc = 'Run script on current line',
+    force = true,
   })
 
   vim.schedule(function()
+    if not enabled or generation ~= setup_generation then return end
     local ok, statuscol = pcall(require, 'vv-statuscol')
     if ok and statuscol.on_click then
-      statuscol.on_click(M.handle_click)
+      if click_dispose then click_dispose() end
+      click_dispose = statuscol.on_click(M.handle_click)
     end
   end)
 

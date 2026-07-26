@@ -26,6 +26,7 @@
 --   })
 
 local core = require('vv-task-panel.core')
+local exit_guard = require('vv-task-panel.exit_guard')
 local ui = require('vv-task-panel.ui')
 local sign = require('vv-task-panel.sign')
 
@@ -33,10 +34,14 @@ local M = {}
 
 ---@param opts VVTaskPanelConfig|nil
 function M.setup(opts)
+  sign.disable()
+  exit_guard.disable()
+  ui.disable()
   core.setup(opts)
   core.register_provider(require('vv-task-panel.providers.npm'))
   ui.setup_commands()
   sign.setup()
+  if core.get_config().exit_guard then exit_guard.setup() end
 end
 
 M.register_provider = core.register_provider
@@ -48,6 +53,11 @@ M.toggle    = ui.toggle_panel
 M.refresh   = ui.refresh
 M.tasks     = ui.open_tasklist
 M.run_at_cursor = sign.run_at_cursor
+function M.disable()
+  sign.disable()
+  exit_guard.disable()
+  ui.disable()
+end
 
 M._core = core
 

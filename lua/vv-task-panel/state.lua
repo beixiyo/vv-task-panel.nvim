@@ -1,0 +1,131 @@
+-- Discovered groups and task execution records
+
+local M = {}
+local groups = {}
+local tasks = {}
+local next_task_id = 1
+
+---@class Task
+---@field id? string
+---@field name string
+---@field argv string[]
+---@field cmd? string
+---@field cwd? string
+---@field env? table<string,string>
+---@field tags? string[]
+
+---@class TaskGroup
+---@field id string
+---@field name string
+---@field dir string
+---@field rel_dir string
+---@field badge string
+---@field provider? string
+---@field tasks Task[]
+
+---@class TaskRecord
+---@field id integer
+---@field group_id string
+---@field group_name string
+---@field task_name string
+---@field argv string[]
+---@field cmd string
+---@field cwd string
+---@field env? table<string,string>
+---@field buf integer
+---@field job_id integer?
+---@field status 'running' | 'success' | 'failed' | 'stopped'
+---@field _stopping? boolean
+---@field exit_code? integer
+---@field started_at integer
+---@field ended_at? integer
+---@field _au? integer
+
+---@param value TaskGroup[]
+function M.set_groups(value)
+  groups = value
+end
+
+---@return TaskGroup[]
+function M.groups()
+  return groups
+end
+
+---@return table<integer, TaskRecord>
+function M.tasks()
+  return tasks
+end
+
+---@return TaskRecord[]
+function M.running_tasks()
+  local running = {}
+
+  for _, task in pairs(tasks) do
+    if task.status == 'running' then running[#running + 1] = task end
+  end
+
+  table.sort(running, function(a, b)
+    if a.group_name ~= b.group_name then
+      return a.group_name < b.group_name
+    end
+    return a.task_name < b.task_name
+  end)
+
+  return running
+end
+
+---@return integer
+function M.allocate_task_id()
+  local id = next_task_id
+  next_task_id = next_task_id + 1
+  return id
+end
+
+---@param record TaskRecord
+function M.add_task(record)
+  tasks[record.id] = record
+end
+
+---@param id integer
+function M.remove_task(id)
+  tasks[id] = nil
+end
+
+---@param group_id string
+---@param task_name string
+---@return TaskRecord?
+function M.find_recent_task(group_id, task_name)
+  local latest
+  for _, task in pairs(tasks) do
+    if task.group_id == group_id and task.task_name == task_name then
+      if not latest or task.started_at > latest.started_at then latest = task end
+    end
+  end
+  return latest
+end
+
+---@param group_id string
+---@param task_name string
+---@return TaskRecord[]
+function M.finished_before_latest(group_id, task_name)
+  local keep
+  for _, task in pairs(tasks) do
+    if task.group_id == group_id and task.task_name == task_name and task.status ~= 'running' then
+      if not keep or task.started_at > keep.started_at then keep = task end
+    end
+  end
+
+  local stale = {}
+  for _, task in pairs(tasks) do
+    if task.group_id == group_id
+      and task.task_name == task_name
+      and task.status ~= 'running'
+      and task ~= keep
+    then
+      stale[#stale + 1] = task
+    end
+  end
+  return stale
+end
+
+return M
