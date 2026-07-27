@@ -1,4 +1,4 @@
--- gx eligibility and statuscol lifecycle regression coverage
+-- g<CR> eligibility and statuscol lifecycle regression coverage
 -- Run: nvim --headless -u NONE -l tests/test_sign_lifecycle.lua
 
 local source = debug.getinfo(1, 'S').source:sub(2)
@@ -32,7 +32,16 @@ package.loaded['vv-task-panel.run'] = {
 }
 
 local task = require('vv-task-panel')
-task.setup({ providers = {} })
+task.setup({
+  providers = {},
+  provider_options = {
+    package_json = {
+      filter = function(script)
+        return not vim.startswith(script.name, '//')
+      end,
+    },
+  },
+})
 vim.wait(100, function() return subscriptions == 1 end)
 
 local buf = vim.api.nvim_create_buf(false, true)
@@ -41,6 +50,7 @@ vim.bo[buf].filetype = 'json'
 vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
   '{',
   '  "scripts": {',
+  '    "// section": "Display only",',
   '    "dev": "vite"',
   '  },',
   '  "not-a-script": "dev"',
@@ -48,34 +58,34 @@ vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
 })
 vim.api.nvim_set_current_buf(buf)
 vim.api.nvim_exec_autocmds('TextChanged', { buffer = buf })
-assert(vim.wait(100, function() return vim.fn.maparg('gx', 'n', false, true).buffer == 1 end),
-  'gx must be buffer-local after a real scripts entry is parsed')
-
-vim.api.nvim_win_set_cursor(0, { 5, 0 })
-vim.api.nvim_feedkeys('gx', 'xt', false)
-vim.wait(20)
-assert(runs == 0, 'gx must not execute on a non-entry line')
+assert(vim.wait(100, function() return vim.fn.maparg('g<CR>', 'n', false, true).buffer == 1 end),
+  'g<CR> must be buffer-local after a real scripts entry is parsed')
 
 vim.api.nvim_win_set_cursor(0, { 3, 0 })
-vim.api.nvim_feedkeys('gx', 'xt', false)
-assert(vim.wait(100, function() return runs == 1 end), 'gx must execute on the parsed entry line')
+vim.api.nvim_feedkeys(vim.keycode('g<CR>'), 'xt', false)
+vim.wait(20)
+assert(runs == 0, 'filtered pseudo-script must not be executable')
 
-local external_gx = function() return 'external' end
-vim.keymap.set('n', 'gx', external_gx, { buffer = buf, desc = 'external gx' })
+vim.api.nvim_win_set_cursor(0, { 4, 0 })
+vim.api.nvim_feedkeys(vim.keycode('g<CR>'), 'xt', false)
+assert(vim.wait(100, function() return runs == 1 end), 'g<CR> must execute on the parsed entry line')
+
+local external_key = function() return 'external' end
+vim.keymap.set('n', 'g<CR>', external_key, { buffer = buf, desc = 'external g<CR>' })
 vim.api.nvim_buf_set_lines(buf, 0, -1, false, { '{ "name": "no scripts" }' })
 vim.api.nvim_exec_autocmds('TextChanged', { buffer = buf })
 vim.wait(100)
 assert(
-  vim.fn.maparg('gx', 'n', false, true).callback == external_gx,
-  'removing scripts must preserve a newer buffer-local gx owner'
+  vim.fn.maparg('g<CR>', 'n', false, true).callback == external_key,
+  'removing scripts must preserve a newer buffer-local g<CR> owner'
 )
-vim.keymap.del('n', 'gx', { buffer = buf })
+vim.keymap.del('n', 'g<CR>', { buffer = buf })
 
 vim.bo[buf].filetype = 'lua'
 vim.api.nvim_buf_set_lines(buf, 0, -1, false, { '{ "scripts": { "dev": "vite" } }' })
 vim.api.nvim_exec_autocmds('TextChanged', { buffer = buf })
 vim.wait(20)
-assert(vim.fn.maparg('gx', 'n', false, true).buffer ~= 1, 'unsupported filetypes must not get gx')
+assert(vim.fn.maparg('g<CR>', 'n', false, true).buffer ~= 1, 'unsupported filetypes must not get g<CR>')
 
 task.register_sign_parser('tasks[1].lua', function(target)
   return {
@@ -95,7 +105,7 @@ vim.api.nvim_buf_set_lines(custom, 0, -1, false, { 'return {}' })
 vim.api.nvim_set_current_buf(custom)
 vim.api.nvim_exec_autocmds('BufEnter', { buffer = custom })
 assert(
-  vim.wait(100, function() return vim.fn.maparg('gx', 'n', false, true).buffer == 1 end),
+  vim.wait(100, function() return vim.fn.maparg('g<CR>', 'n', false, true).buffer == 1 end),
   'parsers registered after setup become active without another setup'
 )
 assert(

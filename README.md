@@ -27,7 +27,7 @@ Task discovery itself is implemented in Lua. Running a discovered script require
 - [Bun](https://github.com/oven-sh/bun) for `bun.lockb` or `bun.lock`
 - [Yarn](https://github.com/yarnpkg/berry) for `yarn.lock`
 - [npm](https://github.com/npm/cli) for `package-lock.json`, or when no supported lockfile is found
-- [Deno](https://github.com/denoland/deno) only when using a custom Deno task provider
+- [Deno](https://github.com/denoland/deno) when running tasks from `deno.json` or `deno.jsonc`
 
 ## Installation
 
@@ -56,6 +56,14 @@ Task discovery itself is implemented in Lua. Running a discovered script require
     term_height = 15,
     term_width = 80,
     providers = nil,
+    provider_options = {
+      package_json = {
+        sort = true,
+        filter = function(script)
+          return not vim.startswith(script.name, '//')
+        end,
+      },
+    },
     icons = {
       pkg_open = '', pkg_closed = '', package = '󰏖', running = '●',
       success = '', failed = '', stopped = '●', pending = '',
@@ -88,6 +96,7 @@ Task discovery itself is implemented in Lua. Running a discovered script require
 | `term_height` | `integer` | `15` | Terminal height in bottom mode |
 | `term_width` | `integer` | `80` | Terminal width in right mode |
 | `providers` | `string[]?` | `nil` | Provider allowlist; `nil` enables every registered provider |
+| `provider_options` | `table<string, table>` | See above | Provider-owned options; custom providers receive the full config and can read `config.provider_options[provider.name]` |
 | `icons` | `table<string, string>` | See above | Individually overridable icons |
 | `sign` | `table<string, VVTaskSignState>` | See above | Status-column icon and highlight settings by state |
 
@@ -103,7 +112,7 @@ When `package.json` or `deno.json` is open, executable script lines receive stat
 | failed | `icons.failed` | Red (`DiagnosticError`) | Failed |
 | stopped | `icons.stopped` | Red (`DiagnosticError`) | Stopped manually |
 
-Run a task by clicking its gutter sign when `vv-statuscol.nvim` is installed, or place the cursor on the script line and press `gx` or run `:VVTaskPanelRunLine`.
+Run a task by clicking its gutter sign when `vv-statuscol.nvim` is installed, or place the cursor on the script line and press `g<CR>` or run `:VVTaskPanelRunLine`.
 
 Override a state independently:
 
@@ -143,18 +152,23 @@ require('vv-task-panel').register_sign_parser('Cargo.toml', function(buf)
 end)
 ```
 
-### Built-in npm provider
+### Built-in providers
 
-The built-in provider scans `package.json` and selects pnpm, Bun, Yarn, or npm from the lockfile. The workspace strategy expands packages from `pnpm-workspace.yaml` or the `workspaces` field in `package.json`.
+The `package_json` provider scans `package.json` and selects pnpm, Bun, Yarn, or npm from the lockfile. The workspace strategy expands packages from `pnpm-workspace.yaml` or the `workspaces` field in `package.json`.
+
+The `deno` provider reads tasks from a root `deno.json` or `deno.jsonc`.
+
+Both providers sort task names alphabetically by default. Set `provider_options.<name>.sort = false` to retain source order. An optional `filter(task)` callback can inspect `provider`, `name`, `command`, `path`, `directory`, and `line`.
 
 ### Custom provider
 
 ```lua
 require('vv-task-panel').register_provider({
-  name = 'deno',
+  name = 'project_tasks',
   priority = 10, -- Higher values run first; equal priorities sort by name
   detect = function(root, cfg)
-    return vim.fs.find('deno.json', { path = root, type = 'file', limit = math.huge })
+    local path = root .. '/tasks.json'
+    return vim.uv.fs_stat(path) and { path } or {}
   end,
   parse = function(path, cfg)
     local ok, data = pcall(vim.json.decode, table.concat(vim.fn.readfile(path), '\n'))
@@ -164,13 +178,13 @@ require('vv-task-panel').register_provider({
     local tasks = {}
 
     for name, cmd in pairs(data.tasks) do
-      tasks[#tasks + 1] = { name = name, argv = { 'deno', 'task', name }, cmd = cmd }
+      tasks[#tasks + 1] = { name = name, argv = { vim.o.shell, '-c', cmd }, cmd = cmd }
     end
 
     return {
       id = path, name = data.name or vim.fn.fnamemodify(dir, ':.'),
       dir = dir, rel_dir = vim.fn.fnamemodify(dir, ':.'),
-      badge = 'deno', tasks = tasks,
+      badge = 'custom', tasks = tasks,
     }
   end,
 })

@@ -18,6 +18,7 @@ local M = {}
 ---@field term_height? integer
 ---@field term_width? integer
 ---@field providers? string[] nil = 启用所有已注册；否则白名单
+---@field provider_options? table<string, table> 按 provider 名称传入的配置；自定义 provider 从 config.provider_options[provider.name] 读取
 ---@field icons? table<string, string>
 ---@field sign? table
 
@@ -37,6 +38,7 @@ local M = {}
 ---@field term_height integer
 ---@field term_width integer
 ---@field providers? string[]
+---@field provider_options table<string, table>
 ---@field icons table<string, string>
 ---@field sign table
 
@@ -68,6 +70,7 @@ local defaults = {
   term_height = 15,
   term_width = 80,
   providers = nil,
+  provider_options = {},
   icons = {
     pkg_open = '',
     pkg_closed = '',
@@ -87,7 +90,7 @@ local defaults = {
     success = { hl = 'VVTaskSignSuccess' },
     failed = { hl = 'VVTaskSignFailed' },
     stopped = { hl = 'VVTaskSignStopped' },
-    keys = { { 'gx', desc = 'Run script' } },
+    keys = { { 'g<CR>', desc = 'Run script' } },
   },
 }
 

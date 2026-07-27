@@ -6,7 +6,7 @@ vim.opt.runtimepath:prepend(vim.fn.fnamemodify(root, ':h') .. '/vv-utils.nvim')
 vim.opt.runtimepath:prepend(root)
 
 local Config = require('vv-task-panel.config')
-local Json = require('vv-task-panel.sign.json')
+local Json = require('vv-task-panel.providers.common.json')
 local PackageManager = require('vv-task-panel.package_manager')
 local Registry = require('vv-task-panel.registry')
 

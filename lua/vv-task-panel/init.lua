@@ -6,25 +6,9 @@
 --   Task      → 可执行的一条命令
 --
 -- 内置 provider：
---   npm   → 递归扫 package.json,按 lockfile 选 pnpm/yarn/bun/npm
+--   package_json → 扫描 package.json，按 lockfile 选 pnpm/yarn/bun/npm
+--   deno         → 读取 deno.json / deno.jsonc 的 tasks
 --
--- 自定义示例：
---   require('vv-task-panel').register_provider({
---     name = 'deno',
---     detect = function(root, cfg) return vim.fs.find('deno.json', { path = root, type = 'file', limit = math.huge }) end,
---     parse = function(path, cfg)
---       local ok, data = pcall(vim.json.decode, table.concat(vim.fn.readfile(path), '\n'))
---       if not ok or type(data.tasks) ~= 'table' then return nil end
---       local dir = vim.fn.fnamemodify(path, ':h')
---       local rel = vim.fn.fnamemodify(dir, ':.')
---       local tasks = {}
---       for name, cmd in pairs(data.tasks) do
---         table.insert(tasks, { name = name, argv = { 'deno', 'task', name }, cmd = cmd })
---       end
---       return { id = path, name = data.name or rel, dir = dir, rel_dir = rel, badge = 'deno', tasks = tasks }
---     end,
---   })
-
 require('vv-task-panel.types')
 
 local core = require('vv-task-panel.core')
@@ -40,7 +24,8 @@ function M.setup(opts)
   exit_guard.disable()
   ui.disable()
   core.setup(opts)
-  core.register_provider(require('vv-task-panel.providers.npm'))
+  core.register_provider(require('vv-task-panel.providers.package_json'))
+  core.register_provider(require('vv-task-panel.providers.deno'))
   ui.setup_commands()
   sign.setup()
   if core.get_config().exit_guard then exit_guard.setup() end

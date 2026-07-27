@@ -1,6 +1,104 @@
--- JSON / JSONC section parsing and direct-key source location
+-- JSON/JSONC 解码与键位置解析，供各 provider 和 statuscolumn 共用
 
 local M = {}
+
+---@param source string
+---@return string
+local function sanitize_jsonc(source)
+  local output = {}
+  local index = 1
+  local in_string = false
+
+  while index <= #source do
+    local char = source:sub(index, index)
+    local next_char = source:sub(index + 1, index + 1)
+
+    if in_string then
+      output[#output + 1] = char
+      if char == '\\' and index < #source then
+        output[#output + 1] = next_char
+        index = index + 2
+      else
+        if char == '"' then in_string = false end
+        index = index + 1
+      end
+    elseif char == '"' then
+      in_string = true
+      output[#output + 1] = char
+      index = index + 1
+    elseif char == '/' and next_char == '/' then
+      output[#output + 1] = ' '
+      output[#output + 1] = ' '
+      index = index + 2
+      while index <= #source and source:sub(index, index) ~= '\n' do
+        output[#output + 1] = ' '
+        index = index + 1
+      end
+    elseif char == '/' and next_char == '*' then
+      output[#output + 1] = ' '
+      output[#output + 1] = ' '
+      index = index + 2
+      while index <= #source do
+        char = source:sub(index, index)
+        next_char = source:sub(index + 1, index + 1)
+        if char == '*' and next_char == '/' then
+          output[#output + 1] = ' '
+          output[#output + 1] = ' '
+          index = index + 2
+          break
+        end
+        output[#output + 1] = char == '\n' and '\n' or ' '
+        index = index + 1
+      end
+    else
+      output[#output + 1] = char
+      index = index + 1
+    end
+  end
+
+  local uncommented = table.concat(output)
+  local cleaned = {}
+  index = 1
+  in_string = false
+
+  while index <= #uncommented do
+    local char = uncommented:sub(index, index)
+    if in_string then
+      cleaned[#cleaned + 1] = char
+      if char == '\\' and index < #uncommented then
+        cleaned[#cleaned + 1] = uncommented:sub(index + 1, index + 1)
+        index = index + 2
+      else
+        if char == '"' then in_string = false end
+        index = index + 1
+      end
+    elseif char == '"' then
+      in_string = true
+      cleaned[#cleaned + 1] = char
+      index = index + 1
+    elseif char == ',' then
+      local lookahead = index + 1
+      while uncommented:sub(lookahead, lookahead):match('%s') do
+        lookahead = lookahead + 1
+      end
+      local target = uncommented:sub(lookahead, lookahead)
+      cleaned[#cleaned + 1] = (target == '}' or target == ']') and ' ' or char
+      index = index + 1
+    else
+      cleaned[#cleaned + 1] = char
+      index = index + 1
+    end
+  end
+
+  return table.concat(cleaned)
+end
+
+---@param source string
+---@return table?
+function M.decode(source)
+  local ok, data = pcall(vim.json.decode, sanitize_jsonc(source))
+  return ok and type(data) == 'table' and data or nil
+end
 
 ---@class VVTaskPanelJsonToken
 ---@field kind 'string' | 'punct'
@@ -35,6 +133,7 @@ local function tokenize(source)
       end
     elseif char == '/' and source:sub(index + 1, index + 1) == '*' then
       index = index + 2
+
       while index <= #source do
         local current = source:sub(index, index)
         if current == '\n' then line = line + 1 end
@@ -48,6 +147,7 @@ local function tokenize(source)
       local start = index
       local token_line = line
       index = index + 1
+
       while index <= #source do
         local current = source:sub(index, index)
         if current == '\\' then
@@ -60,6 +160,7 @@ local function tokenize(source)
           index = index + 1
         end
       end
+
       local raw = source:sub(start, index - 1)
       local value = decode_string(raw)
       if value then
@@ -81,6 +182,7 @@ end
 ---@return integer?
 local function section_start(tokens, section_key)
   local stack = {}
+
   for index, token in ipairs(tokens) do
     if token.kind == 'string'
       and token.value == section_key
@@ -112,6 +214,7 @@ function M.key_lines(source, section_key)
 
   local lines = {}
   local stack = { '{' }
+
   for index = start + 1, #tokens do
     local token = tokens[index]
     if token.kind == 'string'

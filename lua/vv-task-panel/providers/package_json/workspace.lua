@@ -1,8 +1,8 @@
--- npm provider：workspace-aware 扫描，按 lockfile 选包管理器
+-- package.json provider 的 workspace 发现
 -- 扫描策略（config.scan_strategy）：
 --   'workspace' (默认) — 仅扫描 workspace 定义的目录，无 workspace 则只取 root/package.json
 --   'walk'              — 递归遍历（受 max_depth 和 exclude_dirs 约束）
-local M = { name = 'npm', priority = 50 }
+local M = {}
 
 local yaml = require('vv-utils.yaml')
 
@@ -138,8 +138,9 @@ end
 
 --- workspace 策略：检测 workspace 配置 → 展开 globs → 收集 package.json
 ---@param root string
+---@param config VVTaskPanelConfig
 ---@return string[]
-local function detect_workspace(root)
+local function detect_workspace(root, config)
   local results = {}
 
   -- 1. 检测 workspace 定义
@@ -147,9 +148,8 @@ local function detect_workspace(root)
 
   if patterns then
     -- 2. 展开 globs 收集子包
-    local cfg = require('vv-task-panel.core').get_config()
     local excludes = {}
-    for _, d in ipairs(cfg.exclude_dirs or {}) do excludes[d] = true end
+    for _, d in ipairs(config.exclude_dirs or {}) do excludes[d] = true end
     results = expand_globs(root, patterns, excludes)
   end
 
@@ -201,45 +201,7 @@ function M.detect(root, config)
   if strategy == 'walk' then
     return detect_walk(root, config)
   end
-  return detect_workspace(root)
-end
-
----@param path string
----@return VVTaskPanel.TaskGroup|nil
-function M.parse(path)
-  local pkg_dir = vim.fn.fnamemodify(path, ':h')
-  local rel_dir = vim.fn.fnamemodify(pkg_dir, ':.')
-  if rel_dir == '' or rel_dir == '.' then rel_dir = '(root)' end
-
-  local ok_read, lines = pcall(vim.fn.readfile, path)
-  if not ok_read then return nil end
-  local ok_json, data = pcall(vim.json.decode, table.concat(lines, '\n'))
-  if not ok_json or type(data) ~= 'table' then return nil end
-  if type(data.scripts) ~= 'table' then return nil end
-
-  local pm = require('vv-task-panel.core').detect_pm(pkg_dir)  -- 与 sign 共用 core 单一实现，避免判定发散
-
-  local names = {}
-  for k in pairs(data.scripts) do table.insert(names, k) end
-  table.sort(names)
-
-  local tasks = {}
-  for _, n in ipairs(names) do
-    table.insert(tasks, {
-      name = n,
-      argv = { pm, 'run', n },
-      cmd = data.scripts[n],
-    })
-  end
-
-  return {
-    id = path,
-    name = data.name or rel_dir,
-    dir = pkg_dir,
-    rel_dir = rel_dir,
-    badge = pm,
-    tasks = tasks,
-  }
+  return detect_workspace(root, config)
 end
 
 return M

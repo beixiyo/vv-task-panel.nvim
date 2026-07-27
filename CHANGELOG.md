@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.0] - 2026-07-27
+
+### Added
+
+- 新增内置 Deno provider，读取项目根目录 `deno.json` / `deno.jsonc` 中的 tasks
+- 新增 `provider_options.<name>.filter(task)` 与 `sort`，支持按 provider 过滤任务及保留源文件顺序
+- 新增 `providers/common`，统一处理 JSON / JSONC 解码、源码行号、任务过滤与排序
+
+### Changed
+
+- `npm` provider 更名为 `package_json`，准确表示其同时支持 npm、pnpm、Yarn 与 Bun
+- package.json provider 按 workspace 声明发现子包，并根据 lockfile 选择实际包管理器
+- 运行脚本的 buffer-local 快捷键由 `gx` 改为 `g<CR>`
+- 对外通知、错误信息与快捷键说明统一使用英文
+
+### Fixed
+
+- JSONC 中的行注释、块注释和尾随逗号现在可正确解码，不再阻止 Deno task 发现
+- `filter(task)` 在任务面板和 statuscolumn 中使用一致的文件路径、目录与源码行上下文
+
 ## [0.1.2] - 2026-07-26
 
 ### Added

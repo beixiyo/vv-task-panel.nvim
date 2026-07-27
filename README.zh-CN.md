@@ -26,7 +26,7 @@
 - [Bun](https://github.com/oven-sh/bun)：对应 `bun.lockb` 或 `bun.lock`
 - [Yarn](https://github.com/yarnpkg/berry)：对应 `yarn.lock`
 - [npm](https://github.com/npm/cli)：对应 `package-lock.json`，未发现受支持的 lockfile 时也默认使用 npm
-- [Deno](https://github.com/denoland/deno)：仅自定义 Deno task provider 需要
+- [Deno](https://github.com/denoland/deno)：运行 `deno.json` 或 `deno.jsonc` 中的任务时需要
 
 ## 安装
 
@@ -55,6 +55,14 @@
     term_height = 15,               -- bottom 模式下终端高度
     term_width = 80,                -- right 模式下终端宽度
     providers = nil,                -- Provider 白名单（nil = 启用所有已注册的）
+    provider_options = {
+      package_json = {
+        sort = true,                -- false 时保留 package.json 源文件顺序
+        filter = function(script)
+          return not vim.startswith(script.name, '//')
+        end,
+      },
+    },
     icons = {
       pkg_open   = '',
       pkg_closed = '',
@@ -97,6 +105,7 @@
 | `term_height` | `integer` | `15` | `bottom` 模式下终端高度 |
 | `term_width` | `integer` | `80` | `right` 模式下终端宽度 |
 | `providers` | `string[]?` | `nil` | Provider 白名单；`nil` 启用所有已注册 |
+| `provider_options` | `table<string, table>` | *见上方* | 按 provider 名称传入的配置；自定义 provider 从 `config.provider_options[provider.name]` 读取自己的选项 |
 | `icons` | `table<string, string>` | *见上方* | 图标配置，可逐项覆盖 |
 | `sign` | `table<string, VVTaskSignState>` | *见上方* | Statuscolumn 标记按状态配置 icon / hl |
 
@@ -115,7 +124,7 @@
 **运行方式**：
 
 - 鼠标点击 gutter 区域的标记图标（需安装 [vv-statuscol.nvim](https://github.com/beixiyo/vv-statuscol.nvim)，未安装时点击无效）
-- 光标移到脚本行，按 `gx` 或执行 `:VVTaskPanelRunLine`
+- 光标移到脚本行，按 `g<CR>` 或执行 `:VVTaskPanelRunLine`
 
 **覆盖单个状态的图标 / 高亮**：
 
@@ -157,18 +166,23 @@ end)
 
 ---
 
-### 内置 npm Provider
+### 内置 Provider
 
-自动扫描 `package.json`，按 lockfile 选择包管理器（pnpm / bun / yarn / npm）。`workspace` 策略读取 `pnpm-workspace.yaml` 或 `package.json` 的 `workspaces` 字段展开子包
+`package_json` provider 自动扫描 `package.json`，按 lockfile 选择包管理器（pnpm / bun / yarn / npm）。`workspace` 策略读取 `pnpm-workspace.yaml` 或 `package.json` 的 `workspaces` 字段展开子包
+
+`deno` provider 读取项目根目录 `deno.json` 或 `deno.jsonc` 中的 tasks
+
+两个 provider 默认都按名称排序。设 `provider_options.<name>.sort = false` 可保留源文件顺序；可选的 `filter(task)` 能读取 `provider`、`name`、`command`、`path`、`directory` 和 `line`
 
 ### 自定义 Provider
 
 ```lua
 require('vv-task-panel').register_provider({
-  name = 'deno',
+  name = 'project_tasks',
   priority = 10, -- 数值越大越先执行，同优先级按名称排序
   detect = function(root, cfg)
-    return vim.fs.find('deno.json', { path = root, type = 'file', limit = math.huge })
+    local path = root .. '/tasks.json'
+    return vim.uv.fs_stat(path) and { path } or {}
   end,
   parse = function(path, cfg)
     local ok, data = pcall(vim.json.decode, table.concat(vim.fn.readfile(path), '\n'))
@@ -178,13 +192,13 @@ require('vv-task-panel').register_provider({
     local tasks = {}
 
     for name, cmd in pairs(data.tasks) do
-      tasks[#tasks + 1] = { name = name, argv = { 'deno', 'task', name }, cmd = cmd }
+      tasks[#tasks + 1] = { name = name, argv = { vim.o.shell, '-c', cmd }, cmd = cmd }
     end
 
     return {
       id = path, name = data.name or vim.fn.fnamemodify(dir, ':.'),
       dir = dir, rel_dir = vim.fn.fnamemodify(dir, ':.'),
-      badge = 'deno', tasks = tasks,
+      badge = 'custom', tasks = tasks,
     }
   end,
 })

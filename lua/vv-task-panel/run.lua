@@ -10,11 +10,11 @@ local function bind_term_keys(buf, win)
   local close = function()
     if win and vim.api.nvim_win_is_valid(win) then vim.api.nvim_win_close(win, true) end
   end
-  vim.keymap.set('n', 'q',     close, vim.tbl_extend('force', o, { desc = '关闭任务窗口' }))
-  vim.keymap.set('n', '<Esc>', close, vim.tbl_extend('force', o, { desc = '关闭任务窗口' }))
-  vim.keymap.set('t', '<C-q>', close, vim.tbl_extend('force', o, { desc = '关闭任务窗口' }))
+  vim.keymap.set('n', 'q',     close, vim.tbl_extend('force', o, { desc = 'Close task window' }))
+  vim.keymap.set('n', '<Esc>', close, vim.tbl_extend('force', o, { desc = 'Close task window' }))
+  vim.keymap.set('t', '<C-q>', close, vim.tbl_extend('force', o, { desc = 'Close task window' }))
   -- 终端模式 <Esc><Esc> 回到普通模式(再按 <Esc>/q 即关窗);单个 <Esc> 仍透传给进程
-  vim.keymap.set('t', '<Esc><Esc>', [[<C-\><C-n>]], vim.tbl_extend('force', o, { desc = '离开终端模式' }))
+  vim.keymap.set('t', '<Esc><Esc>', [[<C-\><C-n>]], vim.tbl_extend('force', o, { desc = 'Leave terminal mode' }))
 end
 
 ---把光标打到 buffer 末尾,终端接下来的输出会自动跟随
@@ -113,7 +113,7 @@ function M.run(group, task, on_update)
     rec.status = 'failed'
     rec.exit_code = -1
     rec.ended_at = vim.uv.now()
-    vim.notify(string.format('[vv-task-panel] 任务启动失败: %s', rec.cmd), vim.log.levels.ERROR)
+    vim.notify(string.format('[vv-task-panel] Failed to start task: %s', rec.cmd), vim.log.levels.ERROR)
     -- job 没起来,关掉刚开的空终端窗口并把焦点还给原窗口,避免停留在空 buffer
     if term_win and vim.api.nvim_win_is_valid(term_win) then
       pcall(vim.api.nvim_win_close, term_win, true)
@@ -152,7 +152,7 @@ end
 ---@param rec VVTaskPanel.TaskRecord
 function M.focus(rec)
   if not rec or not vim.api.nvim_buf_is_valid(rec.buf) then
-    vim.notify('[vv-task-panel] task buffer 已失效', vim.log.levels.WARN)
+    vim.notify('[vv-task-panel] Task buffer is no longer valid', vim.log.levels.WARN)
     return
   end
   for _, w in ipairs(vim.api.nvim_list_wins()) do

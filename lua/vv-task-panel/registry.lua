@@ -5,9 +5,9 @@ local providers = {}
 
 ---@param provider VVTaskPanel.Provider
 function M.register(provider)
-  assert(provider and type(provider.name) == 'string', 'provider.name 必填')
-  assert(type(provider.detect) == 'function', 'provider.detect 必填')
-  assert(type(provider.parse) == 'function', 'provider.parse 必填')
+  assert(provider and type(provider.name) == 'string', 'provider.name is required')
+  assert(type(provider.detect) == 'function', 'provider.detect is required')
+  assert(type(provider.parse) == 'function', 'provider.parse is required')
   providers[provider.name] = provider
 end
 
