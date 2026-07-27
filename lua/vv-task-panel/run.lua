@@ -53,10 +53,10 @@ local function open_term_win(buf, title)
   return win
 end
 
----@param group TaskGroup
----@param task Task
+---@param group VVTaskPanel.TaskGroup
+---@param task VVTaskPanel.Task
 ---@param on_update fun()  任务状态变化时的回调，给 UI 用
----@return TaskRecord
+---@return VVTaskPanel.TaskRecord
 function M.run(group, task, on_update)
   -- 跑新实例前,回收同 (group,task) 的已结束旧记录(隐藏 buffer / 局部 autocmd / core.tasks 条目),避免重跑累积泄漏
   -- 回收路径单一:仅 dispose 负责,prune_finished 只筛选待回收项
@@ -70,7 +70,7 @@ function M.run(group, task, on_update)
   local id = core.allocate_task_id()
   vim.api.nvim_buf_set_name(buf, string.format('task://%s/%s#%d', group.name, task.name, id))
 
-  ---@type TaskRecord
+  ---@type VVTaskPanel.TaskRecord
   local rec = {
     id = id,
     group_id = group.id,
@@ -149,7 +149,7 @@ function M.run(group, task, on_update)
   return rec
 end
 
----@param rec TaskRecord
+---@param rec VVTaskPanel.TaskRecord
 function M.focus(rec)
   if not rec or not vim.api.nvim_buf_is_valid(rec.buf) then
     vim.notify('[vv-task-panel] task buffer 已失效', vim.log.levels.WARN)
@@ -165,7 +165,7 @@ function M.focus(rec)
   bind_term_keys(rec.buf, win)
 end
 
----@param rec TaskRecord
+---@param rec VVTaskPanel.TaskRecord
 function M.stop(rec)
   if rec.job_id and rec.status == 'running' then
     rec._stopping = true
@@ -173,7 +173,7 @@ function M.stop(rec)
   end
 end
 
----@param rec TaskRecord
+---@param rec VVTaskPanel.TaskRecord
 function M.dispose(rec)
   M.stop(rec)
   -- 清理 buffer 局部 autocmd,否则隐藏 buffer 删除后 autocmd 仍残留累积

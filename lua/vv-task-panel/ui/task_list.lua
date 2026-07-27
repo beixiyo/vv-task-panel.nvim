@@ -10,7 +10,7 @@ local task_lines = {}
 local timer
 local refresh_panel = function() end
 
----@param record TaskRecord?
+---@param record VVTaskPanel.TaskRecord?
 ---@return string
 local function status_glyph(record)
   local icons = core.get_config().icons
@@ -18,7 +18,7 @@ local function status_glyph(record)
   return icons[record.status] or icons.failed
 end
 
----@param record TaskRecord?
+---@param record VVTaskPanel.TaskRecord?
 ---@return string
 local function status_highlight(record)
   if not record then return 'VVTaskPanelPending' end
@@ -37,7 +37,7 @@ local function stop_timer()
   timer = nil
 end
 
----@return TaskRecord?
+---@return VVTaskPanel.TaskRecord?
 local function selected_task()
   if not view.buf then return end
   return (task_lines[view.buf] or {})[vim.fn.line('.')]

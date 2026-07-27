@@ -8,11 +8,11 @@ local M = {}
 ---@class VVTaskPanelSignParser
 ---@field filename string
 ---@field filetypes? table<string, boolean>
----@field parse SignParser
+---@field parse VVTaskPanel.SignParser
 
 ---@param filename string
 ---@param filetypes table<string, boolean>?
----@param parser SignParser
+---@param parser VVTaskPanel.SignParser
 ---@return VVTaskPanelSignParser
 function M.descriptor(filename, filetypes, parser)
   return {
@@ -24,7 +24,7 @@ end
 
 ---@param section_key string
 ---@param make_entry fun(name:string, dir:string): table?
----@return SignParser
+---@return VVTaskPanel.SignParser
 local function json_section(section_key, make_entry)
   return function(buf)
     local source = table.concat(

@@ -1,0 +1,5 @@
+---@class VVTaskPanel.Provider
+---@field name string
+---@field priority? integer 数值越大越先执行，同优先级按名称排序 @default 0
+---@field detect fun(root: string, config: VVTaskPanelConfig): string[]
+---@field parse fun(path: string, config: VVTaskPanelConfig): VVTaskPanel.TaskGroup|nil

@@ -1,0 +1,35 @@
+---@class VVTaskPanel.Task
+---@field id? string
+---@field name string
+---@field argv string[]
+---@field cmd? string
+---@field cwd? string
+---@field env? table<string, string>
+---@field tags? string[]
+
+---@class VVTaskPanel.TaskGroup
+---@field id string
+---@field name string
+---@field dir string
+---@field rel_dir string
+---@field badge string
+---@field provider? string
+---@field tasks VVTaskPanel.Task[]
+
+---@class VVTaskPanel.TaskRecord
+---@field id integer
+---@field group_id string
+---@field group_name string
+---@field task_name string
+---@field argv string[]
+---@field cmd string
+---@field cwd string
+---@field env? table<string, string>
+---@field buf integer
+---@field job_id? integer
+---@field status 'running'|'success'|'failed'|'stopped'
+---@field _stopping? boolean
+---@field exit_code? integer
+---@field started_at integer
+---@field ended_at? integer
+---@field _au? integer

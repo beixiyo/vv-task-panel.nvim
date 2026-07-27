@@ -14,7 +14,7 @@ local function opaque_id(kind, parts)
   return table.concat(encoded, '|')
 end
 
----@param groups TaskGroup[]
+---@param groups VVTaskPanel.TaskGroup[]
 ---@return VVTreePanelNode[]
 function M.nodes(groups)
   local nodes = {}

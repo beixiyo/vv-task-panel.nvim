@@ -1,0 +1,1 @@
+---@alias VVTaskPanel.SignParser fun(buf: integer): { lnum: integer, name: string, argv: string[], cwd: string, badge: string }[]

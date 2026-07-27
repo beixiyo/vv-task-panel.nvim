@@ -25,6 +25,8 @@
 --     end,
 --   })
 
+require('vv-task-panel.types')
+
 local core = require('vv-task-panel.core')
 local exit_guard = require('vv-task-panel.exit_guard')
 local ui = require('vv-task-panel.ui')

@@ -3,13 +3,7 @@
 local M = {}
 local providers = {}
 
----@class Provider
----@field name string
----@field priority? integer 数值越大越先执行，同优先级按名称排序 @default 0
----@field detect fun(root: string, config: VVTaskPanelConfig): string[]
----@field parse fun(path: string, config: VVTaskPanelConfig): TaskGroup|nil
-
----@param provider Provider
+---@param provider VVTaskPanel.Provider
 function M.register(provider)
   assert(provider and type(provider.name) == 'string', 'provider.name 必填')
   assert(type(provider.detect) == 'function', 'provider.detect 必填')
@@ -17,7 +11,7 @@ function M.register(provider)
   providers[provider.name] = provider
 end
 
----@return Provider[]
+---@return VVTaskPanel.Provider[]
 function M.ordered()
   local ordered = {}
 

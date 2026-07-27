@@ -12,7 +12,7 @@ local function is_enabled(name, config)
 end
 
 ---@param root? string
----@return TaskGroup[]
+---@return VVTaskPanel.TaskGroup[]
 function M.discover(root)
   root = root or vim.fn.getcwd()
   local config = Config.get()

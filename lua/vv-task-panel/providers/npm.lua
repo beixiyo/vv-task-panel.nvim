@@ -205,7 +205,7 @@ function M.detect(root, config)
 end
 
 ---@param path string
----@return TaskGroup|nil
+---@return VVTaskPanel.TaskGroup|nil
 function M.parse(path)
   local pkg_dir = vim.fn.fnamemodify(path, ':h')
   local rel_dir = vim.fn.fnamemodify(pkg_dir, ':.')

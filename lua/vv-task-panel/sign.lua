@@ -13,8 +13,6 @@ local ns = vim.api.nvim_create_namespace('vv_task_run')
 ---@type table<integer, { id: integer, name: string, argv: string[], cwd: string, badge: string }[]>
 local buf_tasks = {}
 
----@alias SignParser fun(buf: integer): { lnum: integer, name: string, argv: string[], cwd: string, badge: string }[]
-
 ---@type table<string, VVTaskPanelSignParser>
 local parsers = Parsers.builtins()
 local click_dispose
@@ -197,6 +195,7 @@ local function run_task(buf, entry)
   local fpath = vim.api.nvim_buf_get_name(buf)
   local rel = vim.fn.fnamemodify(entry.cwd, ':.')
 
+  ---@type VVTaskPanel.TaskRecord?
   local existing = core.find_recent_task(fpath, entry.name)
   if existing and existing.status == 'running' then
     run_mod.focus(existing)

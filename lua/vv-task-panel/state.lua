@@ -5,58 +5,22 @@ local groups = {}
 local tasks = {}
 local next_task_id = 1
 
----@class Task
----@field id? string
----@field name string
----@field argv string[]
----@field cmd? string
----@field cwd? string
----@field env? table<string,string>
----@field tags? string[]
-
----@class TaskGroup
----@field id string
----@field name string
----@field dir string
----@field rel_dir string
----@field badge string
----@field provider? string
----@field tasks Task[]
-
----@class TaskRecord
----@field id integer
----@field group_id string
----@field group_name string
----@field task_name string
----@field argv string[]
----@field cmd string
----@field cwd string
----@field env? table<string,string>
----@field buf integer
----@field job_id integer?
----@field status 'running' | 'success' | 'failed' | 'stopped'
----@field _stopping? boolean
----@field exit_code? integer
----@field started_at integer
----@field ended_at? integer
----@field _au? integer
-
----@param value TaskGroup[]
+---@param value VVTaskPanel.TaskGroup[]
 function M.set_groups(value)
   groups = value
 end
 
----@return TaskGroup[]
+---@return VVTaskPanel.TaskGroup[]
 function M.groups()
   return groups
 end
 
----@return table<integer, TaskRecord>
+---@return table<integer, VVTaskPanel.TaskRecord>
 function M.tasks()
   return tasks
 end
 
----@return TaskRecord[]
+---@return VVTaskPanel.TaskRecord[]
 function M.running_tasks()
   local running = {}
 
@@ -81,7 +45,7 @@ function M.allocate_task_id()
   return id
 end
 
----@param record TaskRecord
+---@param record VVTaskPanel.TaskRecord
 function M.add_task(record)
   tasks[record.id] = record
 end
@@ -93,7 +57,7 @@ end
 
 ---@param group_id string
 ---@param task_name string
----@return TaskRecord?
+---@return VVTaskPanel.TaskRecord?
 function M.find_recent_task(group_id, task_name)
   local latest
   for _, task in pairs(tasks) do
@@ -106,7 +70,7 @@ end
 
 ---@param group_id string
 ---@param task_name string
----@return TaskRecord[]
+---@return VVTaskPanel.TaskRecord[]
 function M.finished_before_latest(group_id, task_name)
   local keep
   for _, task in pairs(tasks) do
