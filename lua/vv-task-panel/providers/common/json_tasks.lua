@@ -50,20 +50,21 @@ end
 ---@param section string
 ---@param config VVTaskPanelConfig|VVTaskPanelResolvedConfig
 ---@param provider string
+---@param allow_empty? boolean
 ---@return table?, VVTaskPanel.JsonTask[]?
-function M.parse(path, section, config, provider)
+function M.parse(path, section, config, provider, allow_empty)
   local ok_read, lines = pcall(vim.fn.readfile, path)
   if not ok_read then return nil end
 
   local source = table.concat(lines, '\n')
   local data = Json.decode(source)
-  if not data or type(data[section]) ~= 'table' then return nil end
+  if not data or (not allow_empty and type(data[section]) ~= 'table') then return nil end
 
   local directory = vim.fn.fnamemodify(path, ':h')
   local key_lines = Json.key_lines(source, section)
   local tasks = {} ---@type VVTaskPanel.JsonTask[]
 
-  for name, command in pairs(data[section]) do
+  for name, command in pairs(data[section] or {}) do
     local task = {
       provider = provider,
       name = name,

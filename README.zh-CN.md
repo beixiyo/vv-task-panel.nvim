@@ -61,7 +61,31 @@
         filter = function(script)
           return not vim.startswith(script.name, '//')
         end,
+        presets = {
+          audit = false,
+          outdated = false,
+        },
       },
+      cargo = {
+        presets = {
+          check = true,
+          build = true,
+          test = true,
+          clippy = true,
+          fmt = false,
+        },
+      },
+      go = {
+        presets = {
+          build = true,
+          test = true,
+          vet = true,
+          fmt = false,
+        },
+      },
+    },
+    highlights = {
+      accent = { fg = '#c099ff', bold = true },
     },
     icons = {
       pkg_open   = '',
@@ -106,6 +130,7 @@
 | `term_width` | `integer` | `80` | `right` 模式下终端宽度 |
 | `providers` | `string[]?` | `nil` | Provider 白名单；`nil` 启用所有已注册 |
 | `provider_options` | `table<string, table>` | *见上方* | 按 provider 名称传入的配置；自定义 provider 从 `config.provider_options[provider.name]` 读取自己的选项 |
+| `highlights` | `VVTaskPanelHighlights` | *见上方* | 高亮覆盖；`accent` 控制快捷键提示和统计数字 |
 | `icons` | `table<string, string>` | *见上方* | 图标配置，可逐项覆盖 |
 | `sign` | `table<string, VVTaskSignState>` | *见上方* | Statuscolumn 标记按状态配置 icon / hl |
 
@@ -168,11 +193,10 @@ end)
 
 ### 内置 Provider
 
-`package_json` provider 自动扫描 `package.json`，按 lockfile 选择包管理器（pnpm / bun / yarn / npm）。`workspace` 策略读取 `pnpm-workspace.yaml` 或 `package.json` 的 `workspaces` 字段展开子包
-
-`deno` provider 读取项目根目录 `deno.json` 或 `deno.jsonc` 中的 tasks
-
-两个 provider 默认都按名称排序。设 `provider_options.<name>.sort = false` 可保留源文件顺序；可选的 `filter(task)` 能读取 `provider`、`name`、`command`、`path`、`directory` 和 `line`
+- `package_json`：npm、pnpm、Yarn 与 Bun 的 package scripts、workspace 和包管理命令
+- `deno`：读取 `deno.json` 或 `deno.jsonc` 中的 tasks
+- `cargo`：Rust 常用的构建、测试、检查、lint 和格式化命令
+- `go`：Go 常用的构建、测试、vet 和格式化命令
 
 ### 自定义 Provider
 

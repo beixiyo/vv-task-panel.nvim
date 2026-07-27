@@ -7,8 +7,10 @@ vim.opt.runtimepath:prepend(vim.fn.fnamemodify(root, ':h') .. '/vv-utils.nvim')
 vim.opt.runtimepath:prepend(root)
 
 local Config = require('vv-task-panel.config')
+local Cargo = require('vv-task-panel.providers.cargo')
 local PackageJson = require('vv-task-panel.providers.package_json')
 local Deno = require('vv-task-panel.providers.deno')
+local Go = require('vv-task-panel.providers.go')
 local directory = vim.fn.tempname()
 local path = directory .. '/package.json'
 
@@ -51,6 +53,19 @@ Config.setup({
 assert(vim.deep_equal(names(assert(PackageJson.parse(path, Config.get()))), { 'alpha' }),
   'custom filter receives stable context and decides which scripts become tasks')
 
+Config.setup({
+  provider_options = {
+    package_json = {
+      presets = { audit = true },
+    },
+  },
+})
+local package_with_preset = assert(PackageJson.parse(path, Config.get()))
+assert(package_with_preset.tasks[#package_with_preset.tasks].name == 'Audit dependencies',
+  'package manager presets are opt-in')
+assert(vim.deep_equal(package_with_preset.tasks[#package_with_preset.tasks].argv, { 'npm', 'audit' }),
+  'package manager presets use the detected manager')
+
 local deno_path = directory .. '/deno.jsonc'
 vim.fn.writefile({
   '{',
@@ -67,6 +82,20 @@ assert(vim.deep_equal(Deno.detect(directory), { deno_path }), 'Deno discovers de
 local deno = assert(Deno.parse(deno_path, Config.get()))
 assert(vim.deep_equal(names(deno), { 'check', 'dev' }), 'deno.jsonc tasks preserve source order')
 assert(vim.deep_equal(deno.tasks[2].argv, { 'deno', 'task', 'dev' }), 'Deno tasks use deno task')
+
+local cargo_path = directory .. '/Cargo.toml'
+vim.fn.writefile({ '[package]', 'name = "fixture"' }, cargo_path)
+Config.setup({ provider_options = { cargo = { presets = { build = false, fmt = true } } } })
+local cargo = Cargo.parse(cargo_path, Config.get())
+assert(vim.deep_equal(names(cargo), { 'Check', 'Test', 'Clippy', 'Format' }),
+  'Cargo presets support default, disabled, and opt-in tasks')
+
+local go_path = directory .. '/go.mod'
+vim.fn.writefile({ 'module example.com/fixture', '', 'go 1.24' }, go_path)
+Config.setup({ provider_options = { go = { presets = { vet = false, fmt = true } } } })
+local go = Go.parse(go_path, Config.get())
+assert(vim.deep_equal(names(go), { 'Build all', 'Test all', 'Format all' }),
+  'Go presets support default, disabled, and opt-in tasks')
 
 vim.fn.delete(directory, 'rf')
 print('vv-task-panel providers: PASS')

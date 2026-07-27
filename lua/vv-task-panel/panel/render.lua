@@ -13,7 +13,14 @@ function M.create(core)
       return {
         chunks = {
           { ' ' .. icons.header .. ' Task Panel', 'VVTaskPanelHeader' },
-          { '  CR Run  h/l Fold  t Tasks  g? Help', 'VVTaskPanelFooter' },
+          { '  Run ', 'VVTaskPanelHint' },
+          { '↵', 'VVTaskPanelAccent' },
+          { '  Fold ', 'VVTaskPanelHint' },
+          { 'h/l', 'VVTaskPanelAccent' },
+          { '  Tasks ', 'VVTaskPanelHint' },
+          { 't', 'VVTaskPanelAccent' },
+          { '  Help ', 'VVTaskPanelHint' },
+          { 'g?', 'VVTaskPanelAccent' },
         },
       }
     end,
@@ -22,8 +29,12 @@ function M.create(core)
       local groups = core.groups()
       for _, group in ipairs(groups) do total = total + #group.tasks end
       return {
-        text = ('%d packages · %d tasks'):format(#groups, total),
-        hl = 'Comment',
+        chunks = {
+          { tostring(#groups), 'VVTaskPanelAccent' },
+          { ' packages · ', 'Comment' },
+          { tostring(total), 'VVTaskPanelAccent' },
+          { ' tasks', 'Comment' },
+        },
       }
     end,
     node = function(ctx)
@@ -82,6 +93,7 @@ function M.create(core)
           { task.name, 'VVTaskPanelTask' },
         },
         virt_text = virtual,
+        virt_text_pos = 'eol_right_align',
       }
     end,
     empty = function()

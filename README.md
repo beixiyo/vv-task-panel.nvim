@@ -62,7 +62,31 @@ Task discovery itself is implemented in Lua. Running a discovered script require
         filter = function(script)
           return not vim.startswith(script.name, '//')
         end,
+        presets = {
+          audit = false,
+          outdated = false,
+        },
       },
+      cargo = {
+        presets = {
+          check = true,
+          build = true,
+          test = true,
+          clippy = true,
+          fmt = false,
+        },
+      },
+      go = {
+        presets = {
+          build = true,
+          test = true,
+          vet = true,
+          fmt = false,
+        },
+      },
+    },
+    highlights = {
+      accent = { fg = '#c099ff', bold = true },
     },
     icons = {
       pkg_open = '', pkg_closed = '', package = '󰏖', running = '●',
@@ -97,6 +121,7 @@ Task discovery itself is implemented in Lua. Running a discovered script require
 | `term_width` | `integer` | `80` | Terminal width in right mode |
 | `providers` | `string[]?` | `nil` | Provider allowlist; `nil` enables every registered provider |
 | `provider_options` | `table<string, table>` | See above | Provider-owned options; custom providers receive the full config and can read `config.provider_options[provider.name]` |
+| `highlights` | `VVTaskPanelHighlights` | See above | Highlight overrides; `accent` colors shortcut hints and summary numbers |
 | `icons` | `table<string, string>` | See above | Individually overridable icons |
 | `sign` | `table<string, VVTaskSignState>` | See above | Status-column icon and highlight settings by state |
 
@@ -154,11 +179,10 @@ end)
 
 ### Built-in providers
 
-The `package_json` provider scans `package.json` and selects pnpm, Bun, Yarn, or npm from the lockfile. The workspace strategy expands packages from `pnpm-workspace.yaml` or the `workspaces` field in `package.json`.
-
-The `deno` provider reads tasks from a root `deno.json` or `deno.jsonc`.
-
-Both providers sort task names alphabetically by default. Set `provider_options.<name>.sort = false` to retain source order. An optional `filter(task)` callback can inspect `provider`, `name`, `command`, `path`, `directory`, and `line`.
+- `package_json`: package scripts, workspaces, and package-manager maintenance commands for npm, pnpm, Yarn, and Bun
+- `deno`: tasks from `deno.json` or `deno.jsonc`
+- `cargo`: common Rust build, test, check, lint, and format commands
+- `go`: common Go build, test, vet, and format commands
 
 ### Custom provider
 

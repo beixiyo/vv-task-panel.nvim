@@ -8,6 +8,8 @@
 -- 内置 provider：
 --   package_json → 扫描 package.json，按 lockfile 选 pnpm/yarn/bun/npm
 --   deno         → 读取 deno.json / deno.jsonc 的 tasks
+--   cargo        → Rust 项目的 Cargo 预设任务
+--   go           → Go module 的构建、测试与检查任务
 --
 require('vv-task-panel.types')
 
@@ -26,6 +28,8 @@ function M.setup(opts)
   core.setup(opts)
   core.register_provider(require('vv-task-panel.providers.package_json'))
   core.register_provider(require('vv-task-panel.providers.deno'))
+  core.register_provider(require('vv-task-panel.providers.cargo'))
+  core.register_provider(require('vv-task-panel.providers.go'))
   ui.setup_commands()
   sign.setup()
   if core.get_config().exit_guard then exit_guard.setup() end

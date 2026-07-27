@@ -163,7 +163,7 @@ function M.disable()
 end
 
 function M.setup_commands()
-  Highlights.setup()
+  Highlights.setup(core.get_config().highlights)
   vim.api.nvim_create_user_command('VVTaskPanel', M.toggle_panel, { force = true })
   vim.api.nvim_create_user_command('VVTaskPanelOpen', M.open_panel, { force = true })
   vim.api.nvim_create_user_command('VVTaskPanelClose', M.close_panel, { force = true })

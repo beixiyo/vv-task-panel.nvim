@@ -21,15 +21,23 @@ local groups = {
   VVTaskPanelUptime = 'DiagnosticHint',
   VVTaskPanelArrow = 'Comment',
   VVTaskPanelStatusText = 'Comment',
+  VVTaskPanelHint = 'Comment',
   VVTaskPanelFooter = 'Comment',
 }
 
-function M.setup()
+---@param config VVTaskPanelHighlights
+function M.setup(config)
+  local specs = {}
   for name, link in pairs(groups) do
-    if vim.fn.hlexists(name) == 0 then
-      vim.api.nvim_set_hl(0, name, { link = link })
-    end
+    specs[name] = { link = link }
   end
+  specs.VVTaskPanelAccent = vim.tbl_extend(
+    'force',
+    config.accent or {},
+    { default = false }
+  )
+
+  require('vv-utils.hl').register('vv-task-panel.hl', specs)
 end
 
 return M
