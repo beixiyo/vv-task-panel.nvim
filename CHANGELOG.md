@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.1] - 2026-08-10
+
+### Added
+
+- Cargo provider 根据 `cargo metadata` 选择 `default-run` / `src/main.rs` binary，传递 required features 并提供 `Run main`
+- Go provider 通过 `go list` 判断当前构建上下文的根目录 `main` package，并提供 `Run main`
+
+### Changed
+
+- 任务发现与面板刷新改为可取消的异步流程
+
+### Fixed
+
+- 过期异步结果不再覆盖最新任务分组或已关闭面板；provider 回调统一回到 Neovim 主事件循环
+- Cargo / Go provider 缓存会随源码、manifest 和构建上下文变化失效；仅在 metadata / list 成功且确认存在可运行入口时显示 `Run main`
+
 ## [0.2.0] - 2026-07-27
 
 ### Added

@@ -11,12 +11,47 @@ local TreePanel = require('vv-utils.tree_panel')
 local M = {}
 local active_panel ---@type VVTreePanel?
 local uptime_timer
+local discovery_cancel
+local discovery_id = 0
 
 local function stop_uptime_timer()
   if not uptime_timer then return end
   uptime_timer:stop()
   uptime_timer:close()
   uptime_timer = nil
+end
+
+local function stop_discovery()
+  discovery_id = discovery_id + 1
+  if discovery_cancel then
+    discovery_cancel()
+    discovery_cancel = nil
+  end
+  core.cancel_discover()
+end
+
+---@param panel VVTreePanel?
+---@param notify boolean
+local function start_discovery(panel, notify)
+  stop_discovery()
+  discovery_id = discovery_id + 1
+  local current_id = discovery_id
+  local completed = false
+
+  local function on_complete(groups)
+    completed = true
+    if current_id ~= discovery_id then return end
+
+    discovery_cancel = nil
+    if panel and (active_panel ~= panel or not panel:is_open()) then return end
+    if panel then panel:refresh() end
+    if notify then
+      vim.notify(('[vv-task-panel] %d groups rescanned'):format(#groups))
+    end
+  end
+
+  local cancel = core.discover_async(vim.fn.getcwd(), on_complete)
+  if not completed and current_id == discovery_id then discovery_cancel = cancel end
 end
 
 local function render_panel()
@@ -71,9 +106,7 @@ local function create_panel()
     jump = activate_task,
 
     on_refresh = function(context)
-      core.discover(vim.fn.getcwd())
-      context.panel:refresh()
-      vim.notify(('[vv-task-panel] %d groups rescanned'):format(#core.groups()))
+      start_discovery(context.panel, true)
     end,
     on_attach = function(panel, buf)
       local mappings = vim.tbl_extend('force', {
@@ -93,7 +126,10 @@ local function create_panel()
       title = 'vv-task-panel keymaps',
       filetype = 'vv-task-panel-help',
     } or config.help,
-    on_close = stop_uptime_timer,
+    on_close = function()
+      stop_discovery()
+      stop_uptime_timer()
+    end,
   })
 end
 
@@ -123,14 +159,15 @@ function M.open_panel()
     return
   end
 
-  core.discover(vim.fn.getcwd())
   active_panel = active_panel or create_panel()
   active_panel:open()
   start_uptime_timer()
+  start_discovery(active_panel, false)
 end
 
 function M.close_panel()
   if active_panel then active_panel:close() end
+  stop_discovery()
   stop_uptime_timer()
 end
 
@@ -147,9 +184,7 @@ function M.toggle_panel()
 end
 
 function M.refresh()
-  core.discover(vim.fn.getcwd())
-  render_panel()
-  vim.notify(('[vv-task-panel] %d groups rescanned'):format(#core.groups()))
+  start_discovery(active_panel and active_panel:is_open() and active_panel or nil, true)
 end
 
 function M.show_help()
@@ -157,6 +192,7 @@ function M.show_help()
 end
 
 function M.disable()
+  stop_discovery()
   M.close_panel()
   TaskList.close()
   active_panel = nil

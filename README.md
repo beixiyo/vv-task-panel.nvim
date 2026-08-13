@@ -28,6 +28,8 @@ Task discovery itself is implemented in Lua. Running a discovered script require
 - [Yarn](https://github.com/yarnpkg/berry) for `yarn.lock`
 - [npm](https://github.com/npm/cli) for `package-lock.json`, or when no supported lockfile is found
 - [Deno](https://github.com/denoland/deno) when running tasks from `deno.json` or `deno.jsonc`
+- [Cargo](https://doc.rust-lang.org/cargo/) for Rust presets and `Run main`; the latter uses `cargo metadata` to select the package's `default-run` target or the `src/main.rs` binary and passes its required features
+- [Go](https://go.dev/) for Go presets and `Run main`; the latter is shown only when `go list` selects a main package with `func main()` for the active build context
 
 ## Installation
 
@@ -69,6 +71,7 @@ Task discovery itself is implemented in Lua. Running a discovered script require
       },
       cargo = {
         presets = {
+          run = true, -- Shown when Cargo confirms a runnable default/main binary
           check = true,
           build = true,
           test = true,
@@ -78,6 +81,7 @@ Task discovery itself is implemented in Lua. Running a discovered script require
       },
       go = {
         presets = {
+          run = true, -- Shown when Go confirms a runnable root main package
           build = true,
           test = true,
           vet = true,
@@ -181,8 +185,8 @@ end)
 
 - `package_json`: package scripts, workspaces, and package-manager maintenance commands for npm, pnpm, Yarn, and Bun
 - `deno`: tasks from `deno.json` or `deno.jsonc`
-- `cargo`: common Rust build, test, check, lint, and format commands
-- `go`: common Go build, test, vet, and format commands
+- `cargo`: common Rust build, test, check, lint, and format commands; `Run main` uses Cargo metadata to select the default/main binary and required features
+- `go`: common Go build, test, vet, and format commands; `Run main` is shown when Go confirms a root `main` package with `func main()` in the active build context
 
 ### Custom provider
 

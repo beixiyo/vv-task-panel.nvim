@@ -27,6 +27,8 @@
 - [Yarn](https://github.com/yarnpkg/berry)：对应 `yarn.lock`
 - [npm](https://github.com/npm/cli)：对应 `package-lock.json`，未发现受支持的 lockfile 时也默认使用 npm
 - [Deno](https://github.com/denoland/deno)：运行 `deno.json` 或 `deno.jsonc` 中的任务时需要
+- [Cargo](https://doc.rust-lang.org/cargo/)：运行 Rust 预设与 `Run main`；后者通过 `cargo metadata` 选择 package 的 `default-run` 或 `src/main.rs` binary，并传递其 required features
+- [Go](https://go.dev/)：运行 Go 预设与 `Run main`；仅当 `go list` 在当前构建上下文选择到含 `func main()` 的 main package 时显示后者
 
 ## 安装
 
@@ -68,6 +70,7 @@
       },
       cargo = {
         presets = {
+          run = true, -- Cargo 确认存在可运行的 default/main binary 时显示
           check = true,
           build = true,
           test = true,
@@ -77,6 +80,7 @@
       },
       go = {
         presets = {
+          run = true, -- Go 确认根目录存在可运行 main package 时显示
           build = true,
           test = true,
           vet = true,
@@ -195,8 +199,8 @@ end)
 
 - `package_json`：npm、pnpm、Yarn 与 Bun 的 package scripts、workspace 和包管理命令
 - `deno`：读取 `deno.json` 或 `deno.jsonc` 中的 tasks
-- `cargo`：Rust 常用的构建、测试、检查、lint 和格式化命令
-- `go`：Go 常用的构建、测试、vet 和格式化命令
+- `cargo`：Rust 常用的构建、测试、检查、lint 和格式化命令；`Run main` 通过 Cargo metadata 选择 default/main binary 并传递 required features
+- `go`：Go 常用的构建、测试、vet 和格式化命令；Go 在当前构建上下文确认根目录可运行 main package 后显示 `Run main`
 
 ### 自定义 Provider
 
