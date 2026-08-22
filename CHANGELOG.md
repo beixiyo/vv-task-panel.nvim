@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.2] - 2026-08-22
+
+### Fixed
+
+- package.json provider 会在展开正向 workspace glob 后应用 `!packages/excluded`
+
 ## [0.2.1] - 2026-08-10
 
 ### Added

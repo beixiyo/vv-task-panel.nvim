@@ -14,11 +14,18 @@ local yaml = require('vv-utils.yaml')
 local function expand_globs(root, patterns, excludes)
   local results = {}
   local seen = {}
+  local excluded = {}
+  local collecting_exclusions = false
 
   -- 收集 dir 下含 package.json 的目录
   -- normalize 折叠 '/./' 等冗余片段，确保 '.' 模式与 root 自身去重一致
   local function collect(dir)
     local pkg = vim.fs.normalize(dir .. '/package.json')
+    if collecting_exclusions then
+      if vim.uv.fs_stat(pkg) then excluded[pkg] = true end
+      return
+    end
+
     if vim.uv.fs_stat(pkg) and not seen[pkg] then
       seen[pkg] = true
       table.insert(results, pkg)
@@ -29,6 +36,7 @@ local function expand_globs(root, patterns, excludes)
   local function child_dirs(dir)
     local names = {}
     local handle = vim.uv.fs_scandir(dir)
+
     if not handle then return names end
     while true do
       local name, typ = vim.uv.fs_scandir_next(handle)
@@ -37,6 +45,7 @@ local function expand_globs(root, patterns, excludes)
         table.insert(names, name)
       end
     end
+
     return names
   end
 
@@ -85,20 +94,24 @@ local function expand_globs(root, patterns, excludes)
     end
   end
 
-  for _, pattern in ipairs(patterns) do
-    -- 跳过排除规则
-    if pattern:sub(1, 1) == '!' then goto continue end
-
+  local function expand(pattern)
     -- 拆段后逐段匹配，支持裸 '*'、中间通配 'packages/*/lib' 等
     local segs = vim.split(pattern, '/', { plain = true, trimempty = true })
     if #segs > 0 then
       match(root, segs, 1)
     end
-
-    ::continue::
   end
 
-  return results
+  for _, pattern in ipairs(patterns) do
+    if pattern:sub(1, 1) ~= '!' then expand(pattern) end
+  end
+
+  collecting_exclusions = true
+  for _, pattern in ipairs(patterns) do
+    if pattern:sub(1, 1) == '!' then expand(pattern:sub(2)) end
+  end
+
+  return vim.tbl_filter(function(pkg) return not excluded[pkg] end, results)
 end
 
 --- 从 pnpm-workspace.yaml 读取 workspace 模式

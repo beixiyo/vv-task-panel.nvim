@@ -1,5 +1,5 @@
--- package.json 与 Deno provider 的真实解析行为
--- Run: nvim --headless -u NONE -l tests/test_providers.lua
+-- package.json 与 Deno 提供者的真实解析行为
+-- 运行方式：nvim --headless -u NONE -l tests/test_providers.lua
 
 local source = debug.getinfo(1, 'S').source:sub(2)
 local root = vim.fn.fnamemodify(source, ':p:h:h')
@@ -27,7 +27,7 @@ vim.fn.executable = function(name)
 end
 
 vim.system = function(command, options)
-  local cwd = assert(options.cwd, 'provider system command must use project cwd')
+  local cwd = assert(options.cwd, '提供者系统命令必须使用项目 cwd')
   system_calls[#system_calls + 1] = { command = copy_command(command), cwd = cwd }
   local result
 
@@ -82,7 +82,7 @@ vim.system = function(command, options)
       result = { code = 0, stdout = vim.json.encode({ Name = 'main', CompiledGoFiles = compiled }) }
     end
   else
-    error('unexpected provider command: ' .. table.concat(command, ' '))
+    error('收到未预期的提供者命令：' .. table.concat(command, ' '))
   end
 
   return { wait = function() return result end }
@@ -108,23 +108,23 @@ local function last_system_call(name)
   for index = #system_calls, 1, -1 do
     if system_calls[index].command[1] == name then return system_calls[index] end
   end
-  error('no system call recorded for ' .. name)
+  error('未记录名称为 ' .. name .. ' 的系统调用')
 end
 
 Config.setup({ provider_options = { package_json = { sort = true } } })
 assert(vim.deep_equal(names(assert(PackageJson.parse(path, Config.get()))), { '// section', 'alpha', 'zebra' }),
-  'scripts remain intact by default and sort orders names')
+  '默认保留脚本并按名称排序')
 
 Config.setup({ provider_options = { package_json = { sort = false } } })
 assert(vim.deep_equal(names(assert(PackageJson.parse(path, Config.get()))), { 'zebra', '// section', 'alpha' }),
-  'sort=false preserves package.json source order')
+  'sort=false 时保持 package.json 的源顺序')
 
 Config.setup({
   provider_options = {
     package_json = {
       filter = function(task)
-        assert(task.path == path, 'filter receives the manifest path')
-        assert(task.directory == directory, 'filter receives the package directory')
+        assert(task.path == path, '过滤器接收清单路径')
+        assert(task.directory == directory, '过滤器接收包目录')
         return task.name == 'alpha'
       end,
       sort = false,
@@ -132,7 +132,21 @@ Config.setup({
   },
 })
 assert(vim.deep_equal(names(assert(PackageJson.parse(path, Config.get()))), { 'alpha' }),
-  'custom filter receives stable context and decides which scripts become tasks')
+  '自定义过滤器接收稳定上下文并决定哪些脚本会转换为任务')
+
+local workspace_dir = directory .. '/workspace'
+vim.fn.mkdir(workspace_dir .. '/packages/included', 'p')
+vim.fn.mkdir(workspace_dir .. '/packages/excluded', 'p')
+vim.fn.writefile({ '{}' }, workspace_dir .. '/package.json')
+vim.fn.writefile({ '{}' }, workspace_dir .. '/packages/included/package.json')
+vim.fn.writefile({ '{}' }, workspace_dir .. '/packages/excluded/package.json')
+vim.fn.writefile({ 'packages:', "  - 'packages/*'", "  - '!packages/excluded'" },
+  workspace_dir .. '/pnpm-workspace.yaml')
+Config.setup({ scan_strategy = 'workspace' })
+assert(vim.deep_equal(PackageJson.detect(workspace_dir, Config.get()), {
+  workspace_dir .. '/package.json',
+  workspace_dir .. '/packages/included/package.json',
+}), '负工作区 glob 会移除匹配的包')
 
 Config.setup({
   provider_options = {
@@ -143,33 +157,33 @@ Config.setup({
 })
 local package_with_preset = assert(PackageJson.parse(path, Config.get()))
 assert(package_with_preset.tasks[#package_with_preset.tasks].name == 'Audit dependencies',
-  'package manager presets are opt-in')
+  '包管理器预设是可选的')
 assert(vim.deep_equal(package_with_preset.tasks[#package_with_preset.tasks].argv, { 'npm', 'audit' }),
-  'package manager presets use the detected manager')
+  '包管理器预设会使用检测到的包管理器')
 
 local deno_path = directory .. '/deno.jsonc'
 vim.fn.writefile({
   '{',
-  '  // Deno allows JSONC comments',
+  '  // Deno 允许 JSONC 注释',
   '  "tasks": {',
   '    "check": "deno check main.ts",',
-  '    "dev": "deno run --watch main.ts", // trailing comment',
+  '    "dev": "deno run --watch main.ts", // 行尾注释',
   '  },',
   '}',
 }, deno_path)
 
 Config.setup({ provider_options = { deno = { sort = false } } })
-assert(vim.deep_equal(Deno.detect(directory), { deno_path }), 'Deno discovers deno.jsonc at the project root')
+assert(vim.deep_equal(Deno.detect(directory), { deno_path }), 'Deno 在项目根目录发现 deno.jsonc')
 local deno = assert(Deno.parse(deno_path, Config.get()))
-assert(vim.deep_equal(names(deno), { 'check', 'dev' }), 'deno.jsonc tasks preserve source order')
-assert(vim.deep_equal(deno.tasks[2].argv, { 'deno', 'task', 'dev' }), 'Deno tasks use deno task')
+assert(vim.deep_equal(names(deno), { 'check', 'dev' }), 'deno.jsonc 任务保持源文件顺序')
+assert(vim.deep_equal(deno.tasks[2].argv, { 'deno', 'task', 'dev' }), 'Deno 任务使用 deno task')
 
 local cargo_path = directory .. '/Cargo.toml'
 vim.fn.writefile({ '[package]', 'name = "fixture"' }, cargo_path)
 Config.setup({ provider_options = { cargo = { presets = { build = false, fmt = true } } } })
 local cargo = Cargo.parse(cargo_path, Config.get())
 assert(vim.deep_equal(names(cargo), { 'Check', 'Test', 'Clippy', 'Format' }),
-  'Cargo presets support default, disabled, and opt-in tasks')
+  'Cargo 预设同时支持默认、禁用和可选任务')
 
 vim.fn.mkdir(directory .. '/src', 'p')
 vim.fn.writefile({ 'fn main() {}' }, directory .. '/src/main.rs')
@@ -184,14 +198,14 @@ assert(vim.deep_equal(cargo_call.command,
   { 'cargo', 'metadata', '--no-deps', '--format-version', '1', '--manifest-path', cargo_path }),
   'Cargo metadata 使用完整且可复现的外部命令')
 
--- metadata cache must observe default src/bin targets and explicitly declared
--- targets outside src, otherwise a changed source can leave stale Run main data.
+-- 元数据缓存必须同时考虑默认 src/bin 目标和显式声明的目标
+-- 以及 src 外的目标，否则源码变更后可能留下过期的 Run main 数据
 local cargo_cache_calls = #system_calls
 vim.fn.mkdir(directory .. '/src/bin', 'p')
 vim.fn.writefile({ 'fn main() {}' }, directory .. '/src/bin/tool.rs')
 Cargo.parse(cargo_path, Config.get())
 assert(#system_calls == cargo_cache_calls + 1,
-  'Cargo metadata cache invalidates when a new src/bin target appears')
+  '新增 src/bin 目标时，Cargo 元数据缓存会失效')
 
 local custom_source = directory .. '/custom/main.rs'
 vim.fn.mkdir(directory .. '/custom', 'p')
@@ -206,10 +220,10 @@ vim.fn.writefile({
 }, cargo_path)
 Cargo.parse(cargo_path, Config.get())
 local custom_cache_calls = #system_calls
-vim.fn.writefile({ 'fn main() {}', '// custom source changed' }, custom_source)
+vim.fn.writefile({ 'fn main() {}', '// 自定义源文件已变更' }, custom_source)
 Cargo.parse(cargo_path, Config.get())
 assert(#system_calls == custom_cache_calls + 1,
-  'Cargo metadata cache invalidates when a custom target source changes')
+  '自定义目标源码变更时，Cargo 元数据缓存会失效')
 
 local cargo_default_dir = directory .. '/cargo_default'
 local cargo_default_path = cargo_default_dir .. '/Cargo.toml'
@@ -259,7 +273,7 @@ vim.fn.writefile({ 'module example.com/fixture', '', 'go 1.24' }, go_path)
 Config.setup({ provider_options = { go = { presets = { vet = false, fmt = true } } } })
 local go = Go.parse(go_path, Config.get())
 assert(vim.deep_equal(names(go), { 'Build all', 'Test all', 'Format all' }),
-  'Go presets support default, disabled, and opt-in tasks')
+  'Go 预设支持默认、禁用和可选任务')
 
 vim.fn.writefile({ 'package main', '', 'func main() {}' }, directory .. '/main.go')
 Config.setup({})
@@ -270,8 +284,8 @@ local go_call = last_system_call('go')
 assert(vim.deep_equal(go_call.command, { 'go', 'list', '-mod=readonly', '-json', '.' }),
   'Go list 使用完整且可复现的外部命令')
 
--- Every architecture-specific build-context variable must participate in the
--- cache key. Use the mocked go list so this checks the producer call count.
+-- 每个架构相关的构建上下文变量都必须参与缓存 key 生成
+-- 使用 mock 的 go list，以校验生产者调用次数
 local build_context_variables = {
   'GOOS', 'GOARCH', 'GO386', 'GOAMD64', 'GOARM', 'GOARM64',
   'GOMIPS', 'GOMIPS64', 'GOPPC64', 'GORISCV64', 'GOWASM',
@@ -284,7 +298,7 @@ for _, name in ipairs(build_context_variables) do
   vim.env[name] = (original_context[name] or '') .. '-cache-check'
   local before = #system_calls
   Go.parse(go_path, Config.get())
-  assert(#system_calls == before + 1, 'Go cache key includes ' .. name)
+  assert(#system_calls == before + 1, 'Go 缓存键包含 ' .. name)
   vim.env[name] = original_context[name]
 end
 
@@ -302,7 +316,7 @@ Config.setup({})
 go = Go.parse(go_path, Config.get())
 assert(go.tasks[#go.tasks].name ~= 'Run main', '带返回值的 func main 不显示 Run main')
 
-vim.fn.writefile({ 'package main', '', 'func helper() {', '  // func main() {}', '}' }, directory .. '/main.go')
+vim.fn.writefile({ 'package main', '', 'func helper() {', '  // 注释中的 func main() {}', '}' }, directory .. '/main.go')
 go = Go.parse(go_path, Config.get())
 assert(go.tasks[#go.tasks].name ~= 'Run main', '注释中的 func main 不显示 Run main')
 
@@ -335,9 +349,8 @@ assert(go_invalid.tasks[#go_invalid.tasks].name ~= 'Run main', 'Go list 非法 J
 vim.fn.executable = original_executable
 vim.system = original_system
 
--- When the toolchain is available, exercise the production provider against a
--- real go list response. The architecture-specific files prove that
--- CompiledGoFiles, rather than every GoFiles entry, drives Run main.
+-- 工具链可用时，使用真实 go list 结果运行真实的生产提供者进行验证
+-- 架构相关文件用于证明是 CompiledGoFiles 而非每个 GoFiles 条目触发 Run main
 if vim.fn.executable('go') == 1 then
   local real_go_dir = vim.fn.tempname()
   local real_go_path = real_go_dir .. '/go.mod'
@@ -363,13 +376,13 @@ if vim.fn.executable('go') == 1 then
   Config.setup({})
   local amd64 = Go.parse(real_go_path, Config.get())
   assert(amd64.tasks[#amd64.tasks].name == 'Run main',
-    'real go list CompiledGoFiles includes the amd64 main entry')
+    '真实 go list 的 CompiledGoFiles 包含 amd64 主入口')
 
   vim.env.GOARCH = 'arm64'
   Config.setup({})
   local arm64 = Go.parse(real_go_path, Config.get())
   assert(arm64.tasks[#arm64.tasks].name ~= 'Run main',
-    'real go list build context excludes the non-entry arm64 source')
+    '真实 go list 的构建上下文会排除非入口 arm64 代码')
   vim.env.GOARCH = original_goarch
   vim.fn.delete(real_go_dir, 'rf')
 end
@@ -393,9 +406,9 @@ if vim.fn.executable('cargo') == 1 then
   local real_cargo = Cargo.parse(real_cargo_path, Config.get())
   assert(vim.deep_equal(real_cargo.tasks[#real_cargo.tasks].argv,
     { 'cargo', 'run', '--bin', 'custom-run' }),
-    'real cargo metadata selects the custom default binary target')
+    '真实 cargo 元数据会选择自定义的默认二进制目标')
   vim.fn.delete(real_cargo_dir, 'rf')
 end
 
 vim.fn.delete(directory, 'rf')
-print('vv-task-panel providers: PASS')
+print('vv-task-panel 提供者测试：通过')
