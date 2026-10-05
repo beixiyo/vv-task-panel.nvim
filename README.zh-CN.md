@@ -20,6 +20,8 @@
 
 ## 依赖
 
+[vv-utils.nvim](https://github.com/beixiyo/vv-utils.nvim) 必需，提供任务/UI 共享能力（已包含在下方安装声明中）
+
 任务发现由 Lua 完成；运行任务时，需要安装距离项目最近的 lockfile 所对应的包管理器：
 
 - [pnpm](https://github.com/pnpm/pnpm)：对应 `pnpm-lock.yaml`
@@ -231,3 +233,13 @@ require('vv-task-panel').register_provider({
   end,
 })
 ```
+
+## 开发测试
+
+```sh
+./tests/run.sh [literal-filter]
+```
+
+要求 Neovim 0.12+、Git、POSIX shell 与已有 vv-utils 源码（开发 vendors、lazy 或 native pack；`VV_UTILS` 可覆盖发现）。`NVIM_BIN` 可选择 Neovim。真实 provider 夹具还要求已安装 Go 与 Cargo/rustc。HOME 隔离前通过 `rustup which cargo` 定位真实 Rust bin；可用 `VV_TEST_TOOLCHAIN_BIN` 覆盖，或将原生 Cargo/rustc 放入 PATH。不下载工具链；夹具离线执行 `go list` / `cargo metadata`
+
+依赖发现、显式覆盖、隔离与 CI 检出要求见[共享测试入口](https://github.com/beixiyo/vv-utils.nvim/blob/main/dev/test/README.zh-CN.md)。headless 不替代真实 TUI 验证

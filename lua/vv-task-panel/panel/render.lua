@@ -5,8 +5,11 @@ local Path = require('vv-utils.path')
 local M = {}
 
 ---@param core table
+---@param opts? VVTaskPanelRenderOpts
 ---@return VVTreePanelRenderers
-function M.create(core)
+function M.create(core, opts)
+  local is_discovering = opts and opts.is_discovering or function() return false end
+
   return {
     winbar = function()
       local icons = core.get_config().icons
@@ -28,11 +31,13 @@ function M.create(core)
       local total = 0
       local groups = core.groups()
       for _, group in ipairs(groups) do total = total + #group.tasks end
+      -- 首次扫描未完成时 0 不是可信计数；行尾由 ui 叠加扫描帧
+      local pending = #groups == 0 and is_discovering()
       return {
         chunks = {
-          { tostring(#groups), 'VVTaskPanelAccent' },
+          { pending and '…' or tostring(#groups), 'VVTaskPanelAccent' },
           { ' packages · ', 'Comment' },
-          { tostring(total), 'VVTaskPanelAccent' },
+          { pending and '…' or tostring(total), 'VVTaskPanelAccent' },
           { ' tasks', 'Comment' },
         },
       }
@@ -97,6 +102,7 @@ function M.create(core)
       }
     end,
     empty = function()
+      if is_discovering() then return { text = 'Scanning…', hl = 'Comment' } end
       return {
         text = 'No tasks discovered · press r to rescan',
         hl = 'Comment',
@@ -106,3 +112,6 @@ function M.create(core)
 end
 
 return M
+
+---@class VVTaskPanelRenderOpts
+---@field is_discovering? fun(): boolean 扫描在途时 header / 空状态改为扫描提示 @default 恒为 false

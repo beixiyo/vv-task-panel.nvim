@@ -7,12 +7,15 @@ local PanelModel = require('vv-task-panel.panel.model')
 local PanelRender = require('vv-task-panel.panel.render')
 local TaskList = require('vv-task-panel.ui.task_list')
 local TreePanel = require('vv-utils.tree_panel')
+local Loading = require('vv-utils.loading')
 
 local M = {}
 local active_panel ---@type VVTreePanel?
 local uptime_timer
 local discovery_cancel
 local discovery_id = 0
+local discovering = false
+local scanning_mark ---@type vv-utils.loading.Handle?
 
 local function stop_uptime_timer()
   if not uptime_timer then return end
@@ -21,12 +24,38 @@ local function stop_uptime_timer()
   uptime_timer = nil
 end
 
+local function stop_scanning_mark()
+  if not scanning_mark then return end
+  scanning_mark:stop()
+  scanning_mark = nil
+end
+
+--- 扫描帧画在 header 第 1 行行尾；面板 buffer wipe 时 handle 自行停止
+---@param panel VVTreePanel
+local function start_scanning_mark(panel)
+  stop_scanning_mark()
+  if not panel.buf or not vim.api.nvim_buf_is_valid(panel.buf) then return end
+  scanning_mark = Loading.mark({
+    buf = panel.buf,
+    get_pos = function() return { row = 1 } end,
+    pos = 'eol',
+    label = 'scanning',
+  })
+end
+
+local function finish_discovery()
+  discovering = false
+  discovery_cancel = nil
+  stop_scanning_mark()
+end
+
 local function stop_discovery()
   discovery_id = discovery_id + 1
   if discovery_cancel then
     discovery_cancel()
     discovery_cancel = nil
   end
+  finish_discovery()
   core.cancel_discover()
 end
 
@@ -36,22 +65,45 @@ local function start_discovery(panel, notify)
   stop_discovery()
   discovery_id = discovery_id + 1
   local current_id = discovery_id
-  local completed = false
+  discovering = true
 
-  local function on_complete(groups)
-    completed = true
-    if current_id ~= discovery_id then return end
-
-    discovery_cancel = nil
-    if panel and (active_panel ~= panel or not panel:is_open()) then return end
-    if panel then panel:refresh() end
-    if notify then
-      vim.notify(('[vv-task-panel] %d groups rescanned'):format(#groups))
-    end
+  local function is_live(target)
+    return target and active_panel == target and target:is_open()
   end
 
-  local cancel = core.discover_async(vim.fn.getcwd(), on_complete)
-  if not completed and current_id == discovery_id then discovery_cancel = cancel end
+  -- detect / parse 在 discover_async 内同步执行：先把扫描态画出来，再让出事件循环启动扫描
+  if is_live(panel) then
+    panel:refresh()
+    start_scanning_mark(panel)
+    vim.cmd.redraw()
+  end
+
+  vim.schedule(function()
+    if current_id ~= discovery_id then return end
+    local completed = false
+
+    local function on_complete(groups)
+      completed = true
+      if current_id ~= discovery_id then return end
+
+      finish_discovery()
+      if panel and not is_live(panel) then return end
+      if panel then panel:refresh() end
+      if notify then
+        vim.notify(('[vv-task-panel] %d groups rescanned'):format(#groups))
+      end
+    end
+
+    local ok, cancel = pcall(core.discover_async, vim.fn.getcwd(), on_complete)
+    if current_id ~= discovery_id then return end
+    if not ok then
+      finish_discovery()
+      if is_live(panel) then panel:refresh() end
+      vim.notify('[vv-task-panel] discovery failed: ' .. tostring(cancel), vim.log.levels.ERROR)
+      return
+    end
+    if not completed then discovery_cancel = cancel end
+  end)
 end
 
 local function render_panel()
@@ -60,6 +112,12 @@ end
 
 M.render_panel = render_panel
 M.render_tasklist = TaskList.render
+
+--- 是否有任务扫描在途（打开面板 / 重扫后到完成、失败或取消前）
+---@return boolean
+function M.is_discovering()
+  return discovering
+end
 
 ---@param node VVTreePanelNode
 local function activate_task(node)
@@ -84,7 +142,7 @@ local function create_panel()
   local config = core.get_config()
   local render = vim.tbl_extend(
     'force',
-    PanelRender.create(core),
+    PanelRender.create(core, { is_discovering = M.is_discovering }),
     config.render
   )
   local state = config.state

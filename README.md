@@ -21,6 +21,8 @@ Want my Neovim config? See <a href="https://github.com/beixiyo/dotfiles">dotfile
 
 ## Requirements
 
+[vv-utils.nvim](https://github.com/beixiyo/vv-utils.nvim) is required for shared task/UI infrastructure (included in the installation declaration below).
+
 Task discovery itself is implemented in Lua. Running a discovered script requires the package manager selected from the nearest lockfile:
 
 - [pnpm](https://github.com/pnpm/pnpm) for `pnpm-lock.yaml`
@@ -217,3 +219,13 @@ require('vv-task-panel').register_provider({
   end,
 })
 ```
+
+## Development tests
+
+```sh
+./tests/run.sh [literal-filter]
+```
+
+Requires Neovim 0.12+, Git, POSIX shell and an existing vv-utils checkout (development vendors, lazy or native pack; `VV_UTILS` overrides discovery). `NVIM_BIN` selects Neovim. Real provider fixtures require installed Go and Cargo/rustc. Before HOME isolation, `rustup which cargo` locates the real installed Rust bin; override with `VV_TEST_TOOLCHAIN_BIN` or put native Cargo/rustc on PATH. No toolchains are downloaded; fixtures use offline `go list` / `cargo metadata`.
+
+Dependency discovery, explicit overrides, isolation and CI checkout requirements: [shared test entry](https://github.com/beixiyo/vv-utils.nvim/blob/main/dev/test/README.md). Headless tests do not replace real TUI validation.
