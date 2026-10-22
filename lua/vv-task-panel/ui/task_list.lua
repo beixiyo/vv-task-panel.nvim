@@ -48,7 +48,7 @@ function M.render()
   if not view.buf or not vim.api.nvim_buf_is_valid(view.buf) then return 0, 0 end
 
   local icons = core.get_config().icons
-  local arrow = ' ' .. (icons.arrow or '→') .. ' '
+  local arrow = ' ' .. icons.arrow .. ' '
   local rows = {}
 
   for _, task in pairs(core.tasks()) do rows[#rows + 1] = task end
@@ -65,7 +65,7 @@ function M.render()
     }
   end
 
-  local title_icon = icons.header or ''
+  local title_icon = icons.header
   local title = '  ' .. title_icon .. (title_icon ~= '' and '  ' or '') .. 'Tasks'
   lines[#lines + 1] = title
 

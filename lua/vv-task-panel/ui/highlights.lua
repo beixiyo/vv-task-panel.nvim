@@ -33,7 +33,7 @@ function M.setup(config)
   end
   specs.VVTaskPanelAccent = vim.tbl_extend(
     'force',
-    config.accent or {},
+    config.accent,
     { default = false }
   )
 

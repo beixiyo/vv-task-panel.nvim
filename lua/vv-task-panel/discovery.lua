@@ -43,7 +43,7 @@ local function sort_groups(groups)
 end
 
 ---@param root string
----@param config VVTaskPanelResolvedConfig
+---@param config VVTaskPanelConfig
 ---@param is_current? fun(): boolean
 ---@return { provider: VVTaskPanel.Provider, path: string }[]
 local function detected_entries(root, config, is_current)

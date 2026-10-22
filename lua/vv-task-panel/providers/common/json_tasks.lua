@@ -16,14 +16,14 @@ local M = {}
 ---@field filter? fun(task: VVTaskPanel.JsonTask): boolean 返回 false 时跳过任务
 ---@field sort? boolean 是否按名称排序；false 时保留源文件顺序 @default true
 
----@param config VVTaskPanelConfig|VVTaskPanelResolvedConfig
+---@param config VVTaskPanelConfig
 ---@param provider string
 ---@return VVTaskPanel.JsonTaskOptions
 function M.options(config, provider)
-  return (config.provider_options and config.provider_options[provider]) or {}
+  return config.provider_options[provider] or {}
 end
 
----@param config VVTaskPanelConfig|VVTaskPanelResolvedConfig
+---@param config VVTaskPanelConfig
 ---@param task VVTaskPanel.JsonTask
 ---@return boolean
 function M.include(config, task)
@@ -31,7 +31,7 @@ function M.include(config, task)
   return not filter or filter(task)
 end
 
----@param config VVTaskPanelConfig|VVTaskPanelResolvedConfig
+---@param config VVTaskPanelConfig
 ---@param provider string
 ---@param tasks VVTaskPanel.JsonTask[]
 function M.sort(config, provider, tasks)
@@ -48,7 +48,7 @@ end
 
 ---@param path string
 ---@param section string
----@param config VVTaskPanelConfig|VVTaskPanelResolvedConfig
+---@param config VVTaskPanelConfig
 ---@param provider string
 ---@param allow_empty? boolean
 ---@return table?, VVTaskPanel.JsonTask[]?

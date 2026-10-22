@@ -36,7 +36,7 @@ local icon_keys = {
 ---@return { icon: string, hl: string }
 local function get_style(state)
   local cfg = core.get_config()
-  local s = (cfg.sign or {})[state] or {}
+  local s = cfg.sign[state] or {}
   return {
     icon = s.icon or cfg.icons[icon_keys[state] or 'run'] or '',
     hl = s.hl or 'VVTaskSignIdle',
@@ -117,7 +117,7 @@ end
 local function bind_buf_keys(buf, has_entries)
   clear_buf_keys(buf)
   if not has_entries then return end
-  local keys = (core.get_config().sign or {}).keys
+  local keys = core.get_config().sign.keys
   if not keys then return end
 
   local installed = {}

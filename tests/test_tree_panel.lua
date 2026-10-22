@@ -75,9 +75,8 @@ T["任务树唯一节点、运行导航、持久化宽度与重配释放主面�
     task_panel.setup({
       providers = { 'test' },
       width = 36,
-      state = state,
       position = 'right',
-    })
+    }, { state = state })
     task_panel.register_provider({
       name = 'test',
       detect = function()
@@ -139,9 +138,8 @@ T["任务树唯一节点、运行导航、持久化宽度与重配释放主面�
     task_panel.setup({
       providers = { 'test' },
       width = 57,
-      state = replacement_state,
       position = 'right',
-    })
+    }, { state = replacement_state })
     task_panel.open()
     local replacement_win = vim.api.nvim_get_current_win()
     assert(vim.api.nvim_win_get_width(replacement_win) == 57,

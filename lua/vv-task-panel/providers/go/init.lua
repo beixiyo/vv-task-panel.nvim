@@ -303,7 +303,7 @@ end
 ---@return VVTaskPanel.TaskGroup
 function M.parse(path, config)
   local directory = vim.fn.fnamemodify(path, ':h')
-  local options = (config.provider_options and config.provider_options[M.name]) or {}
+  local options = config.provider_options[M.name] or {}
   local tasks = Presets.build(definitions, options.presets)
 
   if (not options.presets or options.presets.run ~= false) and has_main_entry(directory) then
@@ -326,7 +326,7 @@ end
 ---@return fun()?
 function M.parse_async(path, config, callback)
   local directory = vim.fn.fnamemodify(path, ':h')
-  local options = (config.provider_options and config.provider_options[M.name]) or {}
+  local options = config.provider_options[M.name] or {}
   local include_run = not options.presets or options.presets.run ~= false
 
   if not include_run then

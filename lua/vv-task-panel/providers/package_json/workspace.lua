@@ -162,7 +162,7 @@ local function detect_workspace(root, config)
   if patterns then
     -- 2. 展开 globs 收集子包
     local excludes = {}
-    for _, d in ipairs(config.exclude_dirs or {}) do excludes[d] = true end
+    for _, d in ipairs(config.exclude_dirs) do excludes[d] = true end
     results = expand_globs(root, patterns, excludes)
   end
 
@@ -181,8 +181,8 @@ end
 ---@return string[]
 local function detect_walk(root, config)
   local excludes = {}
-  for _, d in ipairs(config.exclude_dirs or {}) do excludes[d] = true end
-  local max_depth = config.max_depth or 8
+  for _, d in ipairs(config.exclude_dirs) do excludes[d] = true end
+  local max_depth = config.max_depth
   local results = {}
 
   local function walk(dir, depth)
@@ -210,7 +210,7 @@ end
 ---@param config VVTaskPanelConfig
 ---@return string[]
 function M.detect(root, config)
-  local strategy = config.scan_strategy or 'workspace'
+  local strategy = config.scan_strategy
   if strategy == 'walk' then
     return detect_walk(root, config)
   end

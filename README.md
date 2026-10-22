@@ -43,11 +43,10 @@ Task discovery itself is implemented in Lua. Running a discovered script require
     { 'beixiyo/vv-statuscol.nvim', optional = true },
   },
   cmd = { 'VVTaskPanel', 'VVTaskPanelOpen' },
-  ---@type VVTaskPanelConfig
+  ---@type VVTaskPanelOpts
   opts = {
     width = 44,
     position = 'right',
-    state = nil,              -- Optional VVStateHandle; defaults to vv-task-panel/main
     mappings = {},            -- Override vv-utils tree_panel mappings
     render = {},              -- Override winbar/header/node/empty renderers
     exclude_dirs = {
@@ -114,7 +113,6 @@ Task discovery itself is implemented in Lua. Running a discovered script require
 |---|---|---|---|
 | `width` | `integer` | `44` | Initial panel width; manual resize is persisted through `vv-utils.state` |
 | `position` | `'left' \| 'right'` | `'right'` | Panel side |
-| `state` | `VVStateHandle?` | `nil` | Optional state container; defaults to `vv-task-panel/main` |
 | `mappings` | `VVTreePanelMappings` | `{}` | Override or disable shared tree-panel mappings |
 | `render` | `VVTreePanelRenderers` | `{}` | Override `winbar`, `header`, `node`, or `empty` rendering |
 | `help` | `false \| VVTreePanelHelpOptions` | `nil` | Customize or disable the shared `g?` help panel |

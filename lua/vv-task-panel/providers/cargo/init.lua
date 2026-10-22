@@ -283,7 +283,7 @@ end
 ---@return VVTaskPanel.TaskGroup
 local function build_group(path, config, argv)
   local directory = vim.fn.fnamemodify(path, ':h')
-  local options = (config.provider_options and config.provider_options[M.name]) or {}
+  local options = config.provider_options[M.name] or {}
   local tasks = Presets.build(definitions, options.presets)
 
   if argv then tasks[#tasks + 1] = { name = 'Run main', argv = argv } end
@@ -309,7 +309,7 @@ end
 ---@param config VVTaskPanelConfig
 ---@return VVTaskPanel.TaskGroup
 function M.parse(path, config)
-  local options = (config.provider_options and config.provider_options[M.name]) or {}
+  local options = config.provider_options[M.name] or {}
   local argv
   if not options.presets or options.presets.run ~= false then argv = run_argv(path) end
   return build_group(path, config, argv)
@@ -320,7 +320,7 @@ end
 ---@param callback fun(group: VVTaskPanel.TaskGroup)
 ---@return fun()?
 function M.parse_async(path, config, callback)
-  local options = (config.provider_options and config.provider_options[M.name]) or {}
+  local options = config.provider_options[M.name] or {}
   if options.presets and options.presets.run == false then
     callback(build_group(path, config, nil))
     return nil

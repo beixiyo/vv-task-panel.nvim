@@ -145,16 +145,13 @@ local function create_panel()
     PanelRender.create(core, { is_discovering = M.is_discovering }),
     config.render
   )
-  local state = config.state
-    or require('vv-utils.state').register('vv-task-panel', 'main')
-
   return TreePanel.new({
     id = 'vv-task-panel-main',
     title = 'Task Panel',
     filetype = 'vv-task-panel',
     width = config.width,
     position = config.position,
-    state = state,
+    state = config.state,
 
     source = function()
       return PanelModel.nodes(core.groups())

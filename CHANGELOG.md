@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0 - 2026-10-22
+
+### Breaking
+
+- `state` 改由 `setup(opts, deps)` 的 `deps.state` 注入，`opts.state` 不再生效
+- 删除 `VVTaskPanelResolvedConfig`，输入类型改用 `VVTaskPanelOpts`
+
+### Changed
+
+- 新增 `get_config()`
+
 ## 0.2.3 - 2026-10-04
 
 ### Added

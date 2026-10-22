@@ -42,11 +42,10 @@
     { 'beixiyo/vv-statuscol.nvim', optional = true },  -- 鼠标点击 sign 运行任务需要此插件
   },
   cmd = { 'VVTaskPanel', 'VVTaskPanelOpen' },
-  ---@type VVTaskPanelConfig
+  ---@type VVTaskPanelOpts
   opts = {
     width = 44,                     -- 面板宽度
     position = 'right',             -- 'left' | 'right'
-    state = nil,                    -- 可选 VVStateHandle；默认 vv-task-panel/main
     mappings = {},                  -- 覆盖 vv-utils tree_panel 快捷键
     render = {},                    -- 覆盖 winbar/header/node/empty 渲染
     exclude_dirs = {                -- 扫描时跳过的目录
@@ -123,7 +122,6 @@
 |------|------|--------|------|
 | `width` | `integer` | `44` | 面板初始宽度；手动 resize 后通过 `vv-utils.state` 持久化 |
 | `position` | `'left' \| 'right'` | `'right'` | 面板位置 |
-| `state` | `VVStateHandle?` | `nil` | 可选状态容器；默认注册 `vv-task-panel/main` |
 | `mappings` | `VVTreePanelMappings` | `{}` | 覆盖或禁用通用 tree-panel 快捷键 |
 | `render` | `VVTreePanelRenderers` | `{}` | 覆盖 `winbar`、`header`、`node` 或 `empty` 渲染 |
 | `help` | `false \| VVTreePanelHelpOptions` | `nil` | 自定义或禁用通用 `g?` 帮助面板 |
@@ -139,6 +137,7 @@
 | `highlights` | `VVTaskPanelHighlights` | *见上方* | 高亮覆盖；`accent` 控制快捷键提示和统计数字 |
 | `icons` | `table<string, string>` | *见上方* | 图标配置，可逐项覆盖 |
 | `sign` | `table<string, VVTaskSignState>` | *见上方* | Statuscolumn 标记按状态配置 icon / hl |
+
 
 ## Statuscolumn Signs
 

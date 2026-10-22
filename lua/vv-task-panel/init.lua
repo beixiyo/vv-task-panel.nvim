@@ -20,12 +20,13 @@ local sign = require('vv-task-panel.sign')
 
 local M = {}
 
----@param opts VVTaskPanelConfig|nil
-function M.setup(opts)
+---@param opts? VVTaskPanelOpts
+---@param deps? VVTaskPanelDeps
+function M.setup(opts, deps)
   sign.disable()
   exit_guard.disable()
   ui.disable()
-  core.setup(opts)
+  core.setup(opts, deps)
   core.register_provider(require('vv-task-panel.providers.package_json'))
   core.register_provider(require('vv-task-panel.providers.deno'))
   core.register_provider(require('vv-task-panel.providers.cargo'))
@@ -34,6 +35,10 @@ function M.setup(opts)
   sign.setup()
   if core.get_config().exit_guard then exit_guard.setup() end
 end
+
+---读取当前生效配置的副本；修改返回值不影响插件内部状态
+---@type fun(): VVTaskPanelConfig
+M.get_config = core.get_config
 
 M.register_provider = core.register_provider
 M.register_sign_parser = sign.register_parser
