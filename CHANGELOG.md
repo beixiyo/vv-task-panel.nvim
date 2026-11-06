@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1 - 2026-11-06
+
+### Fixed
+
+- 任务面板的 `cursorline` 和 `wrap` 使用窗口局部作用域
+
 ## 0.3.0 - 2026-10-22
 
 ### Breaking

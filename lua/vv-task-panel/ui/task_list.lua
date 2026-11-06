@@ -192,8 +192,8 @@ function M.open(on_panel_refresh)
     title_pos = 'center',
   })
   view.win = win
-  vim.wo[win].cursorline = true
-  vim.wo[win].wrap = false
+  vim.wo[win][0].cursorline = true
+  vim.wo[win][0].wrap = false
 
   local uv = assert(vim.uv)
   local handle = assert(uv.new_timer())
